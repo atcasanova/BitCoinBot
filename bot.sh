@@ -15,7 +15,8 @@ ct=0
 ShellBot.init --token $TOKEN
 parametros() {
 	source variaveis.sh
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Parâmetros:
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text \
+	"@${1}, Parâmetros:
 BTC: > $BTCMAX e < $BTCMIN
 LTC: > $LTCMAX e < $LTCMIN
 INTERVALO DE CHECAGEM: $INTERVALO minutos
@@ -106,7 +107,7 @@ mensagem (){
 	[ -s $(date "+%Y%m%d").dat ] && {
 		rm $(date +"%Y%m%d" --date="1 day ago").dat
 		sed -i "s/set yrange.*/set yrange [${btclow/.*/}:${btchigh/.*/}]/g" geraimagem.pb
-	  gnuplot -c geraimagem.pb 20170727.dat > out.png
+		gnuplot -c geraimagem.pb 20170727.dat > out.png
 		curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png
 	}
 }
