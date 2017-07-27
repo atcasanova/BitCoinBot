@@ -107,7 +107,7 @@ mensagem (){
 	[ -s $(date "+%Y%m%d").dat ] && {
 		rm $(date +"%Y%m%d" --date="1 day ago").dat
 		sed -i "s/set yrange.*/set yrange [${btclow/.*/}:${btchigh/.*/}]/g" geraimagem.pb
-		gnuplot -c geraimagem.pb 20170727.dat > out.png
+		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
 		curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png
 	}
 }
