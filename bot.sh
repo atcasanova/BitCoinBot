@@ -9,7 +9,7 @@ source ShellBot.sh
 
 TOKEN=_SEU_TOKEN_
 apiurl="https://api.telegram.org/bot$TOKEN"
-CHATID=ChatID
+export CHATID=ChatID
 mbtc=https://www.mercadobitcoin.net/api
 ct=0
 ShellBot.init --token $TOKEN
