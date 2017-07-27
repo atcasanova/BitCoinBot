@@ -8,5 +8,7 @@ Sinta-se livre para alterar qualquer coisa e mandar um pull request :)
 
 # Requisitos
 
-Será necessário usar o framework ShellBot (https://github.com/shellscriptx/ShellBot), além do curl e do gnuplot (disponíveis no repositório mais próximo de você)
-
+**ShellBot (https://github.com/shellscriptx/ShellBot)
+curl
+gnuplot
+jq**
