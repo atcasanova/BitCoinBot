@@ -9,6 +9,9 @@ Sinta-se livre para alterar qualquer coisa e mandar um pull request :)
 # Requisitos
 
 **ShellBot (https://github.com/shellscriptx/ShellBot)**
+
 **curl**
+
 **gnuplot**
+
 **jq**
