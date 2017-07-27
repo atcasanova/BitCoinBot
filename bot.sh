@@ -1,6 +1,7 @@
 #!/bin/bash
 # O funcionamento desse bot depende da ShellBot API
 # Disponível em https://github.com/shellscriptx/ShellBot
+#
 
 source ShellBot.sh
 
