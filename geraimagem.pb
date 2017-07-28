@@ -1,6 +1,6 @@
 #!/usr/bin/gnuplot
 reset
-set terminal png
+set terminal png size 1200,600
 
 set xdata time
 set timefmt "%H:%M:%S"
