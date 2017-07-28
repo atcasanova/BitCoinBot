@@ -105,7 +105,7 @@ mensagem (){
 "
 	(( ${#msg} > 2 )) && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	[ -s $(date "+%Y%m%d").dat ] && {
-		rm $(date +"%Y%m%d" --date="1 day ago").dat
+		[ -s $(date +"%Y%m%d" --date="1 day ago").dat ] && rm $(date +"%Y%m%d" --date="1 day ago").dat
 		sed -i "s/set yrange.*/set yrange [${btclow/.*/}:${btchigh/.*/}]/g" geraimagem.pb
 		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
 		curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png
