@@ -80,9 +80,9 @@ mensagem (){
 	source variaveis.sh
 	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 | grep -Eo "[0-9]\.[0-9]+")
 	xapo=$(printf "%0.2f" $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
-	dolar2000=$(echo "scale=4; $dolarbb*1.0844" | bc)
-	dolar3000=$(echo "scale=4; $dolarbb*1.0664" | bc)
-	dolar4000=$(echo "scale=4; $dolarbb*1.0574" | bc)
+	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
+	dolar3000=$(echo "scale=4; ${dolarbb:-0}*1.0664" | bc)
+	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
 	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	msg="*Bitcoin: *R\$ $btc
