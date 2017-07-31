@@ -44,8 +44,8 @@ commandlistener(){
 	}
 	last=oe
 	while : ; do
-		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates"  | jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'| sed 's/ /_/g'); do
-			read offset username command <<< $(echo $comando | sed 's/_/ /g')
+		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates"  | jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'| sed 's/ /)/g'); do
+			read offset username command <<< $(echo $comando | sed 's/)/ /g')
 			shopt -s extglob
 			# Preencher o Grep baixo com os usuarios autorizados a dar comandos separados por pipe
 			grep -Eoq "usuarios|autorizados|a|dar|comandos" <<< "$username" && {
