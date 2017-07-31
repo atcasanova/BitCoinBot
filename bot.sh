@@ -2,14 +2,10 @@
 # O funcionamento desse bot depende da ShellBot API
 # Disponível em https://github.com/shellscriptx/ShellBot
 #
-
 source ShellBot.sh
-
 . variaveis.sh
 
-TOKEN=_SEU_TOKEN_
 apiurl="https://api.telegram.org/bot$TOKEN"
-export CHATID=ChatID
 mbtc=https://www.mercadobitcoin.net/api
 ct=0
 ShellBot.init --token $TOKEN
