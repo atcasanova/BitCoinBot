@@ -1,7 +1,4 @@
 #!/bin/bash
-# O funcionamento desse bot depende da ShellBot API
-# Disponível em https://github.com/shellscriptx/ShellBot
-#
 source ShellBot.sh
 . variaveis.sh
 
@@ -11,8 +8,7 @@ ct=0
 ShellBot.init --token $TOKEN
 parametros() {
 	source variaveis.sh
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text \
-	"@${1}, Parâmetros:
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Parâmetros:
 BTC: > $BTCMAX e < $BTCMIN
 LTC: > $LTCMAX e < $LTCMIN
 INTERVALO DE CHECAGEM: $INTERVALO minutos
@@ -47,8 +43,7 @@ commandlistener(){
 		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates"  | jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'| sed 's/ /)/g'); do
 			read offset username command <<< $(echo $comando | sed 's/)/ /g')
 			shopt -s extglob
-			# Preencher o Grep baixo com os usuarios autorizados a dar comandos separados por pipe
-			grep -Eoq "usuarios|autorizados|a|dar|comandos" <<< "$username" && {
+			grep -Eoq "^(usuarios|autorizados|a|dar|comandos)$" <<< "$username" && {
 				grep -Eoq "^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
@@ -74,6 +69,7 @@ commandlistener &
 
 mensagem (){
 	source variaveis.sh
+	read foxbitsell foxbithigh <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" | jq -r '"\(.sell) \(.high)"')
 	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 | grep -Eo "[0-9]\.[0-9]+")
 	xapo=$(printf "%0.2f" $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
 	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
@@ -81,8 +77,12 @@ mensagem (){
 	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
 	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	msg="*Bitcoin: *R\$ $btc
+	diff=$(echo "scale=3; (($foxbitsell/$btc)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
+	msg="*Bitcoin: *
+MercadoBTC: R\$ $btc
 (*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")%
+FoxBit: R\$ $foxbitsell
+( Diferença: ${diff:-quasenada}% )
 
 *Xapo:* USD $xapo
 
@@ -102,9 +102,11 @@ mensagem (){
 	(( ${#msg} > 2 )) && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	[ -s $(date "+%Y%m%d").dat ] && {
 		[ -s $(date "+%Y%m%d" --date="1 day ago").dat ] && rm $(date "+%Y%m%d" --date="1 day ago").dat
-		sed -i "s/set yrange.*/set yrange [${btclow/.*/}:${btchigh/.*/}]/g" geraimagem.pb
-		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
-		curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png
+		maior=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | tail -1)
+		menor=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | head -1)
+		sed -i "s/set yrange.*/set yrange [ $((${menor/.*/}-100)):$((100+${maior/.*/}))]/g" geraimagem.pb
+	  gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
+		curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png >/dev/null
 	}
 }
 
@@ -124,6 +126,8 @@ do
 	xapo=$(printf "%0.2f " $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
 	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read foxbitsell foxbithigh <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" | jq -r '"\(.sell) \(.high)"')
+	diff=$(echo "scale=3; (($foxbitsell/$btc)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
 	(( ${btc/.*/} > $BTCMAX )) || (( ${btc/.*/} < $BTCMIN )) && {
 		((${btc/.*/} != $lastbtc )) && msg="*Bitcoin:* R\$ $btc
 (*>* $btchigh / *<* $btclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc| grep -Eo "[0-9]*\.[0-9]{2}")%" 
@@ -132,6 +136,10 @@ do
 	(( ${rate/.*/} >= 4 )) && {
 		msg+="
 *MercadoBTC/Xapo:* $rate ($btc/$xapo)"
+	}
+	(( ${diff/.*} >= 4 )) && {
+		msg+="
+*Diferença da FoxBit para MercadoBitcoin em ${diff}%!*"
 	}
 	(( ${ltc/.*/} > $LTCMAX )) || (( ${ltc/.*/} < $LTCMIN )) && {
 		(( ${ltc/.*/} != $lastltc )) && msg+="
@@ -142,7 +150,7 @@ do
 	lastltc=${ltc/.*/}
 	(( ${#msg} > 2 )) && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	[ ! -s $(date "+%Y%m%d").dat ] && echo "##hora valor" > $(date "+%Y%m%d").dat
-	echo "$(date "+%H:%M:%S") ${btc/.*/}" >> $(date "+%Y%m%d").dat
+	echo "$(date "+%H:%M:%S") ${btc/.*/} ${foxbitsell/.*/}" >> $(date "+%Y%m%d").dat
 done
 	
 
