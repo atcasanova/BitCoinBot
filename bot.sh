@@ -49,12 +49,31 @@ commandlistener(){
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
 						case $command in 
-							/ltcmax*) (( ${command/* /} != $LTCMAX )) && { envia "@${username}, setando *LTCMAX* para ${command/* /}"; atualizavar LTCMAX ${command/* /}; atualizavar last "$command"; };;
-							/ltcmin*) (( ${command/* /} != $LTCMIN )) && { envia "@${username}, setando *LTCMIN* para ${command/* /}"; atualizavar LTCMIN ${command/* /}; atualizavar last "$command"; };;
-							/btcmax*) (( ${command/* /} != $BTCMAX )) && { envia "@${username}, setando *BTCMAX* para ${command/* /}"; atualizavar BTCMAX ${command/* /}; atualizavar last "$command"; };;
-							/btcmin*) (( ${command/* /} != $BTCMIN )) && { envia "@${username}, setando *BTCMIN* para ${command/* /}"; atualizavar BTCMIN ${command/* /}; atualizavar last "$command"; };;
-							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && { envia "@${username}, setando *intervalo* para ${command/* /} minutos"; atualizavar INTERVALO ${command/* /}; atualizavar last "$command"; };;
-							/parametros) parametros $username;  atualizavar last "$command";;
+							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
+								envia "@${username}, setando *LTCMAX* para ${command/* /}";
+								atualizavar LTCMAX ${command/* /}; atualizavar last "$command"; 
+							};;
+							/ltcmin*) (( ${command/* /} != $LTCMIN )) && {
+								envia "@${username}, setando *LTCMIN* para ${command/* /}";
+								atualizavar LTCMIN ${command/* /};
+								atualizavar last "$command"; 
+							};;
+							/btcmax*) (( ${command/* /} != $BTCMAX )) && {
+								envia "@${username}, setando *BTCMAX* para ${command/* /}";
+								atualizavar BTCMAX ${command/* /};
+								atualizavar last "$command";
+							};;
+							/btcmin*) (( ${command/* /} != $BTCMIN )) && {
+								envia "@${username}, setando *BTCMIN* para ${command/* /}";
+								atualizavar BTCMIN ${command/* /};
+								atualizavar last "$command";
+							};;
+							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && {
+								envia "@${username}, setando *intervalo* para ${command/* /} minutos";
+								atualizavar INTERVALO ${command/* /};
+								atualizavar last "$command";
+							};;
+							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
 						esac
 					}
@@ -69,14 +88,18 @@ commandlistener &
 
 mensagem (){
 	source variaveis.sh
-	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" | jq -r '"\(.sell) \(.high) \(.low)"')
-	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 | grep -Eo "[0-9]\.[0-9]+")
+	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" |\
+	jq -r '"\(.sell) \(.high) \(.low)"')
+	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 |\
+	grep -Eo "[0-9]\.[0-9]+")
 	xapo=$(printf "%0.2f" $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
 	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
 	dolar3000=$(echo "scale=4; ${dolarbb:-0}*1.0664" | bc)
 	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
-	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
+	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
+	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
 		maior=FoxBit
 		menor=MercadoBTC
@@ -89,9 +112,11 @@ mensagem (){
 
 	msg="*Bitcoin: *
 MercadoBTC: R\$ $btc
-(*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")%
+(*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|\
+grep -Eo "[0-9]*\.[0-9]{2}")%
 FoxBit: R\$ $foxbitsell
-(*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc| grep -Eo "[0-9]*\.[0-9]{2}")%
+(*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc|\
+grep -Eo "[0-9]*\.[0-9]{2}")%
 
 *( Diferença: $maior ${diff:-0}% mais caro que $menor )*
 
@@ -108,7 +133,8 @@ FoxBit: R\$ $foxbitsell
 "
 	msg+="
 *Litecoin:* R\$ $ltc
-(*>* $ltchigh / *<* $ltclow) Var: $(echo "scale=4; ($ltchigh/$ltclow-1)*100"|bc| grep -Eo "[0-9]*\.[0-9]{2}")%
+(*>* $ltchigh / *<* $ltclow) Var: $(echo "scale=4; ($ltchigh/$ltclow-1)*100"|bc|\
+grep -Eo "[0-9]*\.[0-9]{2}")%
 "
 	(( ${#msg} > 2 )) && { 
 		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
@@ -136,10 +162,14 @@ do
 	sleep ${INTERVALO}m
 	msg=
 	
-	xapo=$(printf "%0.2f " $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
-	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin | jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" | jq -r '"\(.sell) \(.high) \(.low)"')
+	xapo=$(printf "%0.2f " $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD |\
+	jq '.fx_etoe.BTCUSD.destination_amt'))
+	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
+	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
+	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" |\
+	jq -r '"\(.sell) \(.high) \(.low)"')
 	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
 		maior=FoxBit
 		menor=MercadoBTC
@@ -151,12 +181,14 @@ do
 	}
 	(( ${btc/.*/} > $BTCMAX )) || (( ${btc/.*/} < $BTCMIN )) && {
 		((${btc/.*/} != $lastbtc )) && msg="*MercadoBitCoin:* R\$ $btc
-(*>* $btchigh / *<* $btclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc| grep -Eo "[0-9]*\.[0-9]{2}")%" 
+(*>* $btchigh / *<* $btclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc|\
+grep -Eo "[0-9]*\.[0-9]{2}")%" 
 	} 
 	(( ${foxbitsell/.*/} > $BTCMAX )) || (( ${foxbitsell/.*/} < $BTCMIN )) && {
 		((${btc/.*/} != $lastbtc )) && msg+="
 		*FoxBit:* R\$ $foxbitsell
-		(*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc| grep -Eo "[0-9]*\.[0-9]{2}")%" 
+		(*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc|\
+		grep -Eo "[0-9]*\.[0-9]{2}")%" 
 	} 
 	rate=$(echo "scale=2; $btc/$xapo" |bc)
 	rate=${rate:-3}
@@ -174,7 +206,8 @@ do
 	(( ${ltc/.*/} > $LTCMAX )) || (( ${ltc/.*/} < $LTCMIN )) && {
 		(( ${ltc/.*/} != $lastltc )) && msg+="
 *Litecoin:* R\$ $ltc
-(*>* $ltchigh / *<* $ltclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc| grep -Eo "[0-9]*\.[0-9]{2}")%"
+(*>* $ltchigh / *<* $ltclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc|\
+grep -Eo "[0-9]*\.[0-9]{2}")%"
 	} 
 	lastbtc=${btc/.*/}
 	lastltc=${ltc/.*/}
@@ -184,5 +217,4 @@ do
 	[ ! -s $(date "+%Y%m%d").dat ] && echo "##hora valor" > $(date "+%Y%m%d").dat
 	echo "$(date "+%H:%M:%S") ${btc/.*/} ${foxbitsell/.*/}" >> $(date "+%Y%m%d").dat
 done
-	
 
