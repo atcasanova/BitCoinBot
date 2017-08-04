@@ -26,7 +26,9 @@ ajuda() {
 */parametros*"
 }
 
-read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  | jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"' | tail -1)
+read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  |\
+jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"' |\
+tail -1)
 
 export offset
 export command
@@ -40,7 +42,9 @@ commandlistener(){
 	}
 	last=oe
 	while : ; do
-		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates"  | jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'| sed 's/ /_/g'); do
+		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
+		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
+		sed 's/ /_/g'); do
 			read offset username command <<< $(echo $comando | sed 's/_/ /g')
 			shopt -s extglob
 			grep -Eoq "atcasanova|eliashamu|jgnpa80|carlossiqueira" <<< "$username" && {
