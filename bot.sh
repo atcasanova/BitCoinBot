@@ -42,12 +42,13 @@ commandlistener(){
 	}
 	last=oe
 	while : ; do
+		. variaveis.sh
 		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
 		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
 		sed 's/ /_/g'); do
 			read offset username command <<< $(echo $comando | sed 's/_/ /g')
 			shopt -s extglob
-			grep -Eoq "atcasanova|eliashamu|jgnpa80|carlossiqueira" <<< "$username" && {
+			grep -Eoq "$USUARIOS" <<< "$username" && {
 				grep -Eoq "^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
@@ -104,6 +105,8 @@ mensagem (){
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s https://api.bitcambio.com.br/api/cotacao |\
+	jq -r '"\(.comprepor) \(.vendapor)"'))
 	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
 		maior=FoxBit
 		menor=MercadoBTC
@@ -121,6 +124,8 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 FoxBit: R\$ $foxbitsell
 (*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc|\
 grep -Eo "[0-9]*\.[0-9]{2}")%
+
+BitCambio: R\$ $bitcambiosell
 
 *( Diferença: $maior ${diff:-0}% mais caro que $menor )*
 
@@ -155,8 +160,24 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 
 mensagem
 
-lastltc=0
-lastbtc=0
+alerta(){
+	valorhigh=$1
+	valormin=$2
+	valoraferido=$3
+	exchangemax=$4
+	exchangemin=$5
+	exchange=$6
+	(( ${valoraferido/.*/} > ${valorhigh} )) ||\
+	(( ${valoraferido/.*/} < ${valormin} )) && {
+		msg+="*${exchange}:* R\$ $valoraferido
+"
+		(( exchangemax > 0 )) && {
+			msg+="(*Max* R\$ $exchangemax / *Min* R\$ $exchangemin)
+Δ% na $exchange: $(echo "scale=4; ($exchangemax/$exchangemin-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")% 
+"
+		}
+	}
+}
 
 while : 
 do
@@ -183,17 +204,11 @@ do
 		menor=FoxBit
 		diff=$(echo "scale=3; (($btc/$foxbitsell)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
 	}
-	(( ${btc/.*/} > $BTCMAX )) || (( ${btc/.*/} < $BTCMIN )) && {
-		((${btc/.*/} != $lastbtc )) && msg="*MercadoBitCoin:* R\$ $btc
-(*>* $btchigh / *<* $btclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc|\
-grep -Eo "[0-9]*\.[0-9]{2}")%" 
-	} 
-	(( ${foxbitsell/.*/} > $BTCMAX )) || (( ${foxbitsell/.*/} < $BTCMIN )) && {
-		((${btc/.*/} != $lastbtc )) && msg+="
-		*FoxBit:* R\$ $foxbitsell
-		(*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc|\
-		grep -Eo "[0-9]*\.[0-9]{2}")%" 
-	} 
+	alerta $BTCMAX $BTCMIN $btc $btchigh $btcmin MercadoBitcoin
+	alerta $BTCMAX $BTCMIN $foxbitsell $foxbithigh $foxbitlow FoxBit
+	alerta $BTCMAX $BTCMIN $bitcambiosell 0 0 BitCambio
+	alerta $LTCMAX $LTCMIN $ltc $ltchigh $ltclow "MercadoBitcoin(Litecoin)"
+
 	rate=$(echo "scale=2; $btc/$xapo" |bc)
 	rate=${rate:-3}
 	(( ${rate/.*/} >= 4 )) && {
@@ -207,18 +222,11 @@ grep -Eo "[0-9]*\.[0-9]{2}")%"
 *FoxBit:* R\$ $foxbitsell
 *MercadoBitcoin:* R\$ $btc"
 	}
-	(( ${ltc/.*/} > $LTCMAX )) || (( ${ltc/.*/} < $LTCMIN )) && {
-		(( ${ltc/.*/} != $lastltc )) && msg+="
-*Litecoin:* R\$ $ltc
-(*>* $ltchigh / *<* $ltclow) Var: $(echo "scale=4; ($btchigh/$btclow-1)*100"|bc|\
-grep -Eo "[0-9]*\.[0-9]{2}")%"
-	} 
-	lastbtc=${btc/.*/}
-	lastltc=${ltc/.*/}
+	echo "$msg"
 	(( ${#msg} > 2 )) && {
 		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	}
 	[ ! -s $(date "+%Y%m%d").dat ] && echo "##hora valor" > $(date "+%Y%m%d").dat
-	echo "$(date "+%H:%M:%S") ${btc/.*/} ${foxbitsell/.*/}" >> $(date "+%Y%m%d").dat
+	echo "$(date "+%H:%M:%S") ${btc/.*/} ${foxbitsell/.*/} ${bitcambiosell/.*/}" >> $(date "+%Y%m%d").dat
 done
 
