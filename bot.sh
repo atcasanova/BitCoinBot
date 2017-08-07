@@ -2,6 +2,8 @@
 source ShellBot.sh
 . variaveis.sh
 
+foxbiturl="https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC"
+bitcambiourl="https://api.bitcambio.com.br/api/cotacao"
 apiurl="https://api.telegram.org/bot$TOKEN"
 mbtc=https://www.mercadobitcoin.net/api
 ct=0
@@ -93,7 +95,7 @@ commandlistener &
 
 mensagem (){
 	source variaveis.sh
-	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" |\
+	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
 	jq -r '"\(.sell) \(.high) \(.low)"')
 	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 |\
 	grep -Eo "[0-9]\.[0-9]+")
@@ -105,7 +107,7 @@ mensagem (){
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s https://api.bitcambio.com.br/api/cotacao |\
+	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s "$bitcambiourl" |\
 	jq -r '"\(.comprepor) \(.vendapor)"'))
 	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
 		maior=FoxBit
@@ -195,6 +197,8 @@ do
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" |\
 	jq -r '"\(.sell) \(.high) \(.low)"')
+	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s "$bitcambiourl" |\
+	jq -r '"\(.comprepor) \(.vendapor)"'))
 	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
 		maior=FoxBit
 		menor=MercadoBTC
