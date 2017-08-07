@@ -8,7 +8,7 @@ set format x "%H:%M"
 set xlabel "horario"
 
 set ylabel "Valor"
-set yrange [ 8810:9324]
+set yrange [ 10132:11020]
 
 set title "Valor do Bitcoin hoje"
 set key reverse left outside
@@ -16,5 +16,6 @@ set grid
 
 set style data linespoints
 plot ARG1 using 1:2 title "MercadoBitCoin", \
-	   ARG1 using 1:3 title "FoxBit"
+	   ARG1 using 1:3 title "FoxBit", \
+		 ARG1 using 1:4 title "BitCambio"
 #
