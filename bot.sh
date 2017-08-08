@@ -51,7 +51,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/_/ /g')
 			shopt -s extglob
 			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$" <<< "$command" && {
+				grep -Eoq "^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -78,6 +78,11 @@ commandlistener(){
 							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && {
 								envia "@${username}, setando *intervalo* para ${command/* /} minutos";
 								atualizavar INTERVALO ${command/* /};
+								atualizavar last "$command";
+							};;
+							/porcentagem*) [ "${command/* /}" != "$PORCENTAGEM" ] && {
+								envia "@${username}, setando *porcentagem* para ${command/* /}%";
+								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
 							/parametros) parametros $username; atualizavar last "$command";;
@@ -109,27 +114,23 @@ mensagem (){
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s "$bitcambiourl" |\
 	jq -r '"\(.comprepor) \(.vendapor)"'))
-	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
-		maior=FoxBit
-		menor=MercadoBTC
-		diff=$(echo "scale=3; (($foxbitsell/$btc)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
-	} || { 
-		maior=MercadoBTC
-		menor=FoxBit
-		diff=$(echo "scale=3; (($btc/$foxbitsell)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
-	}
+	read maior lixo menor <<< $(echo "${foxbitsell/.*/},Foxbit
+${btc/.*/},MercadoBitCoin
+${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
+	IFS=, read maiorvlr maiorexchange <<< $maior
+	IFS=, read menorvlr menorexchange <<< $menor
+	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
 
 	msg="*Bitcoin: *
-MercadoBTC: R\$ $btc
+*MercadoBTC:* R\$ $btc
 (*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|\
 grep -Eo "[0-9]*\.[0-9]{2}")%
-FoxBit: R\$ $foxbitsell
+*FoxBit:* R\$ $foxbitsell
 (*>* $foxbithigh / *<* $foxbitlow) Var: $(echo "scale=4; ($foxbithigh/$foxbitlow-1)*100"|bc|\
 grep -Eo "[0-9]*\.[0-9]{2}")%
+*BitCambio:* R\$ $bitcambiosell
 
-BitCambio: R\$ $bitcambiosell
-
-*( Diferença: $maior ${diff:-0}% mais caro que $menor )*
+*( Diferença: $maiorexchange ${diff:-0}% mais caro que $menorexchange )*
 
 *Xapo:* USD $xapo
 
@@ -138,9 +139,9 @@ BitCambio: R\$ $bitcambiosell
 *USD 3000*: $dolar3000
 *USD 4000*: $dolar4000
 "
-	rate=$(echo "scale=2; $btc/$xapo" |bc)
+	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
 	msg+="
-*MercadoBTC/Xapo:* $rate
+*$maiorexchange/Xapo:* $rate
 "
 	msg+="
 *Litecoin:* R\$ $ltc
@@ -199,28 +200,26 @@ do
 	jq -r '"\(.sell) \(.high) \(.low)"')
 	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s "$bitcambiourl" |\
 	jq -r '"\(.comprepor) \(.vendapor)"'))
-	(( ${foxbitsell/.*/} >= ${btc/.*/} )) && {
-		maior=FoxBit
-		menor=MercadoBTC
-		diff=$(echo "scale=3; (($foxbitsell/$btc)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
-	} || { 
-		maior=MercadoBTC
-		menor=FoxBit
-		diff=$(echo "scale=3; (($btc/$foxbitsell)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
-	}
+	read maior lixo menor <<< $(echo "${foxbitsell/.*/},Foxbit
+${btc/.*/},MercadoBitCoin
+${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
+	IFS=, read maiorvlr maiorexchange <<< $maior
+	IFS=, read menorvlr menorexchange <<< $menor
+	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
+	
 	alerta $BTCMAX $BTCMIN $btc $btchigh $btcmin MercadoBitcoin
 	alerta $BTCMAX $BTCMIN $foxbitsell $foxbithigh $foxbitlow FoxBit
 	alerta $BTCMAX $BTCMIN $bitcambiosell 0 0 BitCambio
 	alerta $LTCMAX $LTCMIN $ltc $ltchigh $ltclow "MercadoBitcoin(Litecoin)"
 
-	rate=$(echo "scale=2; $btc/$xapo" |bc)
+	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
 	rate=${rate:-3}
-	(( ${rate/.*/} >= 4 )) && {
+	(( ${rate/.*/} >= ${PORCENTAGEM} )) && {
 		msg+="
-*MercadoBTC/Xapo:* $rate ($btc/$xapo)"
+*$maiorexchange/Xapo:* $rate ($btc/$xapo)"
 	}
 	diff=${diff:-0}
-	(( ${diff/.*} >= 4 )) && {
+	(( ${diff/.*} >= ${PORCENTAGEM} )) && {
 		msg+="
 *$maior ${diff}% mais caro que $menor*
 *FoxBit:* R\$ $foxbitsell
