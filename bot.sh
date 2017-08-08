@@ -38,69 +38,6 @@ tail -1)
 export offset
 export command
 
-commandlistener(){
-	atualizavar() {
-		sed -i "s-$1.*-$1=\"$2\"-g" variaveis.sh
-	}
-	envia(){
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$1"
-	}
-	last=oe
-	while : ; do
-		. variaveis.sh
-		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
-		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
-		sed 's/ /_/g'); do
-			read offset username command <<< $(echo $comando | sed 's/_/ /g')
-			shopt -s extglob
-			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
-					source variaveis.sh
-					[ "$command" != "$last" ] && {
-						echo $offset - $command - $last >> comandos.log
-						case $command in 
-							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
-								envia "@${username}, setando *LTCMAX* para ${command/* /}";
-								atualizavar LTCMAX ${command/* /}; atualizavar last "$command"; 
-							};;
-							/ltcmin*) (( ${command/* /} != $LTCMIN )) && {
-								envia "@${username}, setando *LTCMIN* para ${command/* /}";
-								atualizavar LTCMIN ${command/* /};
-								atualizavar last "$command"; 
-							};;
-							/btcmax*) (( ${command/* /} != $BTCMAX )) && {
-								envia "@${username}, setando *BTCMAX* para ${command/* /}";
-								atualizavar BTCMAX ${command/* /};
-								atualizavar last "$command";
-							};;
-							/btcmin*) (( ${command/* /} != $BTCMIN )) && {
-								envia "@${username}, setando *BTCMIN* para ${command/* /}";
-								atualizavar BTCMIN ${command/* /};
-								atualizavar last "$command";
-							};;
-							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && {
-								envia "@${username}, setando *intervalo* para ${command/* /} minutos";
-								atualizavar INTERVALO ${command/* /};
-								atualizavar last "$command";
-							};;
-							/porcentagem*) [ "${command/* /}" != "$PORCENTAGEM" ] && {
-								envia "@${username}, setando *porcentagem* para ${command/* /}%";
-								atualizavar PORCENTAGEM ${command/* /};
-								atualizavar last "$command";
-							};;
-							/cotacoes) mensagem; atualizavar last "$command";;
-							/parametros) parametros $username; atualizavar last "$command";;
-							/help) ajuda $username; atualizavar last "$command";;
-						esac
-					}
-				}
-			}
-		done
-	sleep 10s
-	done
-}
-
-commandlistener &
 
 mensagem (){
 	source variaveis.sh
@@ -185,6 +122,70 @@ alerta(){
 		}
 	}
 }
+
+commandlistener(){
+	atualizavar() {
+		sed -i "s-$1.*-$1=\"$2\"-g" variaveis.sh
+	}
+	envia(){
+		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$1"
+	}
+	last=oe
+	while : ; do
+		. variaveis.sh
+		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
+		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
+		sed 's/ /_/g'); do
+			read offset username command <<< $(echo $comando | sed 's/_/ /g')
+			shopt -s extglob
+			grep -Eoq "$USUARIOS" <<< "$username" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
+					source variaveis.sh
+					[ "$command" != "$last" ] && {
+						echo $offset - $command - $last >> comandos.log
+						case $command in 
+							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
+								envia "@${username}, setando *LTCMAX* para ${command/* /}";
+								atualizavar LTCMAX ${command/* /}; atualizavar last "$command"; 
+							};;
+							/ltcmin*) (( ${command/* /} != $LTCMIN )) && {
+								envia "@${username}, setando *LTCMIN* para ${command/* /}";
+								atualizavar LTCMIN ${command/* /};
+								atualizavar last "$command"; 
+							};;
+							/btcmax*) (( ${command/* /} != $BTCMAX )) && {
+								envia "@${username}, setando *BTCMAX* para ${command/* /}";
+								atualizavar BTCMAX ${command/* /};
+								atualizavar last "$command";
+							};;
+							/btcmin*) (( ${command/* /} != $BTCMIN )) && {
+								envia "@${username}, setando *BTCMIN* para ${command/* /}";
+								atualizavar BTCMIN ${command/* /};
+								atualizavar last "$command";
+							};;
+							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && {
+								envia "@${username}, setando *intervalo* para ${command/* /} minutos";
+								atualizavar INTERVALO ${command/* /};
+								atualizavar last "$command";
+							};;
+							/porcentagem*) [ "${command/* /}" != "$PORCENTAGEM" ] && {
+								envia "@${username}, setando *porcentagem* para ${command/* /}%";
+								atualizavar PORCENTAGEM ${command/* /};
+								atualizavar last "$command";
+							};;
+							/cotacoes) mensagem; atualizavar last "$command";;
+							/parametros) parametros $username; atualizavar last "$command";;
+							/help) ajuda $username; atualizavar last "$command";;
+						esac
+					}
+				}
+			}
+		done
+	sleep 10s
+	done
+}
+
+commandlistener &
 
 while : 
 do
