@@ -173,7 +173,7 @@ alerta(){
 	(( ${valoraferido/.*/} < ${valormin} )) && {
 		msg+="*${exchange}:* R\$ $valoraferido
 "
-		(( exchangemax > 0 )) && {
+		(( ${exchangemax/.*/} > 0 )) && {
 			msg+="(*Max* R\$ $exchangemax / *Min* R\$ $exchangemin)
 Δ% na $exchange: $(echo "scale=4; ($exchangemax/$exchangemin-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")% 
 "
