@@ -38,7 +38,6 @@ tail -1)
 export offset
 export command
 
-
 mensagem (){
 	source variaveis.sh
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
@@ -61,7 +60,6 @@ ${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
 	IFS=, read maiorvlr maiorexchange <<< $maior
 	IFS=, read menorvlr menorexchange <<< $menor
 	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
-
 	msg="*Bitcoin: *
 *MercadoBTC:* R\$ $btc
 (*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|\
