@@ -13,7 +13,8 @@ parametros() {
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Parâmetros:
 BTC: > $BTCMAX e < $BTCMIN
 LTC: > $LTCMAX e < $LTCMIN
-INTERVALO DE CHECAGEM: $INTERVALO minutos
+CHECAGEM A CADA $INTERVALO minutos
+ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
 "
 }
 parametros
@@ -25,7 +26,9 @@ ajuda() {
 */btcmax 9500*
 */btcmin 8000*
 */intervalo 5*
-*/parametros*"
+*/porcentagem 4*
+*/parametros*
+*/cotacoes*"
 }
 
 read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  |\
@@ -51,7 +54,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/_/ /g')
 			shopt -s extglob
 			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -85,6 +88,7 @@ commandlistener(){
 								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
+							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
 						esac
