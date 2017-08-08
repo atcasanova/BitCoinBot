@@ -210,10 +210,10 @@ ${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
 	IFS=, read menorvlr menorexchange <<< $menor
 	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
 	
-	alerta $BTCMAX $BTCMIN $btc $btchigh $btcmin MercadoBitcoin
-	alerta $BTCMAX $BTCMIN $foxbitsell $foxbithigh $foxbitlow FoxBit
-	alerta $BTCMAX $BTCMIN $bitcambiosell 0 0 BitCambio
-	alerta $LTCMAX $LTCMIN $ltc $ltchigh $ltclow "MercadoBitcoin(Litecoin)"
+	alerta ${BTCMAX:-0} ${BTCMIN:-0} ${btc:-0} ${btchigh:-0} ${btcmin:-0} MercadoBitcoin
+	alerta ${BTCMAX:-0} ${BTCMIN:-0} ${foxbitsell:-0} ${foxbithigh:-0} ${foxbitlow:-0} FoxBit
+	alerta ${BTCMAX:-0} ${BTCMIN:-0} ${bitcambiosell:-0} 0 0 BitCambio
+	alerta ${LTCMAX:-0} ${LTCMIN:-0} ${ltc:-0} ${ltchigh:-0} ${ltclow:-0} "MercadoBitcoin(Litecoin)"
 
 	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
 	rate=${rate:-3}
