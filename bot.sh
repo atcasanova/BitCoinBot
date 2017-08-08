@@ -103,20 +103,22 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 mensagem
 
 alerta(){
-	valorhigh=$1
-	valormin=$2
-	valoraferido=$3
-	exchangemax=$4
-	exchangemin=$5
-	exchange=$6
-	(( ${valoraferido/.*/} > ${valorhigh} )) ||\
-	(( ${valoraferido/.*/} < ${valormin} )) && {
-		msg+="*${exchange}:* R\$ $valoraferido
-"
-		(( ${exchangemax/.*/} > 0 )) && {
-			msg+="(*Max* R\$ $exchangemax / *Min* R\$ $exchangemin)
-Δ% na $exchange: $(echo "scale=4; ($exchangemax/$exchangemin-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")% 
-"
+	(( $# == 6 )) && {
+		valorhigh=$1
+		valormin=$2
+		valoraferido=$3
+		exchangemax=$4
+		exchangemin=$5
+		exchange=$6
+		(( ${valoraferido/.*/} > ${valorhigh} )) ||\
+		(( ${valoraferido/.*/} < ${valormin} )) && {
+			msg+="*${exchange}:* R\$ $valoraferido
+	"
+			(( ${exchangemax/.*/} > 0 )) && {
+				msg+="(*Max* R\$ $exchangemax / *Min* R\$ $exchangemin)
+	Δ% na $exchange: $(echo "scale=4; ($exchangemax/$exchangemin-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")% 
+	"
+			}
 		}
 	}
 }
