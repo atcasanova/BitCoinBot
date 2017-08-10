@@ -1,4 +1,5 @@
 #!/bin/bash
+[ -s ShellBot.sh ] || wget "https://raw.githubusercontent.com/shellscriptx/ShellBot/master/ShellBot.sh"
 source ShellBot.sh
 . variaveis.sh
 
