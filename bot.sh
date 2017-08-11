@@ -227,9 +227,8 @@ ${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
 	diff=${diff:-0}
 	(( ${diff/.*} >= ${PORCENTAGEM} )) && {
 		msg+="
-*$maior ${diff}% mais caro que $menor*
-*FoxBit:* R\$ $foxbitsell
-*MercadoBitcoin:* R\$ $btc"
+*$maiorexchange ($maiorvlr) ${diff}% mais caro que $menorexchange ($menorvlr)*
+"
 	}
 	echo "$msg"
 	(( ${#msg} > 2 )) && {
