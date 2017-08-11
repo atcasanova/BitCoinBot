@@ -110,7 +110,7 @@ alerta(){
 	exchangemax=$4
 	exchangemin=$5
 	exchange=$6
-	(( {valoraferido/.*/} == 0 )) || {
+	(( ${valoraferido/.*/} == 0 )) || {
 		(( ${valoraferido/.*/} > ${valorhigh} )) ||\
 		(( ${valoraferido/.*/} < ${valormin} )) && {
 			msg+="*${exchange}:* R\$ $valoraferido
