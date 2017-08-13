@@ -43,15 +43,15 @@ mensagem (){
 	source variaveis.sh
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
 	jq -r '"\(.sell) \(.high) \(.low)"')
-	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 |\
+	dolarbb=$(curl -s https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 |\
 	grep -Eo "[0-9]\.[0-9]+")
-	xapo=$(printf "%0.2f" $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
+	xapo=$(printf "%0.2f" $(curl -s https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
 	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
 	dolar3000=$(echo "scale=4; ${dolarbb:-0}*1.0664" | bc)
 	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
-	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
+	read btc btchigh btclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
+	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker_litecoin |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s "$bitcambiourl" |\
 	jq -r '"\(.comprepor) \(.vendapor)"'))
@@ -196,11 +196,11 @@ do
 	sleep ${INTERVALO}m
 	msg=
 	
-	xapo=$(printf "%0.2f " $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD |\
+	xapo=$(printf "%0.2f " $(curl -s https://api.xapo.com/v3/quotes/BTCUSD |\
 	jq '.fx_etoe.BTCUSD.destination_amt'))
-	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
+	read btc btchigh btclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
+	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker_litecoin |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" |\
 	jq -r '"\(.sell) \(.high) \(.low)"')
