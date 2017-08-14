@@ -8,7 +8,12 @@ bitcambiourl="https://api.bitcambio.com.br/api/cotacao"
 apiurl="https://api.telegram.org/bot$TOKEN"
 mbtc=https://www.mercadobitcoin.net/api
 ct=0
+
+# Import arquivos com funções de taxas
+. taxas.sh
+
 ShellBot.init --token $TOKEN
+
 parametros() {
 	source variaveis.sh
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Parâmetros:
@@ -49,9 +54,9 @@ mensagem (){
 	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
 	dolar3000=$(echo "scale=4; ${dolarbb:-0}*1.0664" | bc)
 	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
-	read btc btchigh btclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker |\
+	read btc btchigh btclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker/ |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker_litecoin |\
+	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker_litecoin/ |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -s "$bitcambiourl" |\
 	jq -r '"\(.comprepor) \(.vendapor)"'))
@@ -198,9 +203,9 @@ do
 	
 	xapo=$(printf "%0.2f " $(curl -s https://api.xapo.com/v3/quotes/BTCUSD |\
 	jq '.fx_etoe.BTCUSD.destination_amt'))
-	read btc btchigh btclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker |\
+	read btc btchigh btclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker/ |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker_litecoin |\
+	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(curl -s $mbtc/ticker_litecoin/ |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" |\
 	jq -r '"\(.sell) \(.high) \(.low)"')
