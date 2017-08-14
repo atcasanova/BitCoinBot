@@ -141,8 +141,8 @@ commandlistener(){
 		. variaveis.sh
 		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
 		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
-		sed 's/ /_/g'); do
-			read offset username command <<< $(echo $comando | sed 's/_/ /g')
+		sed 's/ /|/g'); do
+			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			grep -Eoq "$USUARIOS" <<< "$username" && {
 				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
