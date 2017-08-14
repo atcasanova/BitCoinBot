@@ -190,10 +190,10 @@ commandlistener &
 
 while : 
 do
-	source variaveis.sh
 	let ct+=1
 	(( ct % 12 == 0 )) && { mensagem; sed -i "s/last=.*/last=oe/g" variaveis.sh ; }
 	sleep ${INTERVALO}m
+	source variaveis.sh
 	msg=
 	
 	xapo=$(printf "%0.2f " $(curl -s https://api.xapo.com/v3/quotes/BTCUSD |\
