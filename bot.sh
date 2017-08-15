@@ -240,6 +240,7 @@ ${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
 		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	}
 	[ ! -s $(date "+%Y%m%d").dat ] && echo "##hora valor" > $(date "+%Y%m%d").dat
-	echo "$(date "+%H:%M:%S") ${btc/.*/} ${foxbitsell/.*/} ${bitcambiosell/.*/}" >> $(date "+%Y%m%d").dat
+	read gmbtc gfoxbit gbitcambio <<< "${btc:-0} ${foxbitsell:-0} ${bitcambiosell:-0}"
+	echo "$(date "+%H:%M:%S") ${gmbtc/.*/} ${gfoxbit/.*/} ${gbitcambio/.*/}" >> $(date "+%Y%m%d").dat
 done
 
