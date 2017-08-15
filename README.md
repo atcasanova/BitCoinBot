@@ -15,3 +15,7 @@ Sinta-se livre para alterar qualquer coisa e mandar um pull request :)
 **gnuplot**
 
 **jq**
+
+**bc**
+
+**wget**
