@@ -32,7 +32,7 @@ ajuda() {
 */btcmax 9500*
 */btcmin 8000*
 */intervalo 5*
-*/porcentagem 4*
+*/porcentagem 4.01*
 */parametros*
 */cotacoes*"
 }
@@ -145,7 +145,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}$" <<< "$command" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -225,12 +225,12 @@ ${bitcambiosell/.*/},BitCambio" | sort -nrk1 -t, | tr '\n' ' ')
 
 	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
 	rate=${rate:-3}
-	(( ${rate/.*/} >= ${PORCENTAGEM} )) && {
+	(( $(echo "${rate} >= ${PORCENTAGEM}"|bc) == 1 )) && {
 		msg+="
 *$maiorexchange/Xapo:* $rate ($btc/$xapo)"
 	}
 	diff=${diff:-0}
-	(( ${diff/.*} >= ${PORCENTAGEM} )) && {
+	(( $(echo "${diff} >= ${PORCENTAGEM}"|bc) == 1 )) && {
 		msg+="
 *$maiorexchange ($maiorvlr) ${diff}% mais caro que $menorexchange ($menorvlr)*
 "
