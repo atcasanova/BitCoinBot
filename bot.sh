@@ -19,6 +19,21 @@ ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
 }
 parametros
 
+coin() {
+	coin=$1
+	local usd=$(curl -s https://api.bitfinex.com/v1/pubticker/${1}usd | jq -r '.last_price')
+	[ "$usd" == "null" ] && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na bitfinex" || { 
+		[ "${coin,,}" == "btc" ] && btc=1 || local btc=$(curl -s https://api.bitfinex.com/v1/pubticker/${coin}btc | jq -r '.last_price')
+		local msg="\`\`\`
+Cotação BitFinex para ${coin^^}:
+USD $usd
+BTC $btc
+\`\`\`
+"
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
+	}
+}
+
 ajuda() {
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Comandos aceitos:
 */ltcmax 170*
@@ -28,7 +43,8 @@ ajuda() {
 */intervalo 5*
 */porcentagem 4.01*
 */parametros*
-*/cotacoes*"
+*/cotacoes*
+*/coin moeda*"
 }
 
 read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  |\
@@ -88,14 +104,16 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 "
 	(( ${#msg} > 2 )) && { 
 		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
+		ShellBot.sendMessage --parse_mode markdown --disable_notification true --chat_id 424845561 --text "$msg"
 	}
 	[ -s $(date "+%Y%m%d").dat ] && {
 		[ -s $(date "+%Y%m%d" --date="1 day ago").dat ] && cat $(date "+%Y%m%d" --date="1 day ago").dat >> /historico.dat
 		maior=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | tail -1)
 		menor=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | head -1)
-		sed -i "s/set yrange.*/set yrange [ $((${menor/.*/}-300)):$((100+${maior/.*/}))]/g" geraimagem.pb
+		sed -i "s/set yrange.*/set yrange [ $((${menor/.*/}*95/100)):$((${maior/.*/}*105/100))]/g" geraimagem.pb
 		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
-		curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png 2>&1 >/dev/null
+		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png | jq -r '.result.photo[] | .file_id' | tail -1)
+		curl -s -X POST "$apiurl/sendPhoto" -F disable_notification=true -F chat_id=424845561 -F photo=$idphoto >/dev/null
 	}
 }
 
@@ -138,7 +156,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$" <<< "$command" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin [a-zA-Z0-9]+$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -172,6 +190,7 @@ commandlistener(){
 								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
+							/coin*) [ "${command}" != "$last" ] && { coin ${command/* }; atualizavar last "$command"; echo $command; } ;;
 							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
@@ -188,7 +207,7 @@ commandlistener &
 
 while : 
 do
-	dolar=$(curl -s "http://download.finance.yahoo.com/d/quotes.csv?e=.csv&f=sl1d1t1&s=USDBRL=X" | grep -Eo "[0-9]+\.[0-9]+" || echo $dolar)
+	dolar=$(curl -s "https://finance.google.com/finance/converter?a=1&from=USD&to=BRL&meta=ei%3DJCL7WfnFL428e6vMn5AL"|grep result | grep -Eo "[0-9]\.[0-9]+" || echo $dolar)
 	let ct+=1
 	(( ct % 12 == 0 )) && { mensagem; sed -i "s/last=.*/last=oe/g" variaveis.sh ; }
 	sleep ${INTERVALO}m
