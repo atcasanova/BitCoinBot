@@ -21,15 +21,21 @@ parametros
 
 coin() {
 	coin=$1
-	local usd=$(curl -s https://api.bitfinex.com/v1/pubticker/${1}usd | jq -r '.last_price')
+	(( $# == 2 )) && qtd=$2 || qtd=0
+	local usd=$(curl -s https://api.bitfinex.com/v1/pubticker/${coin}usd | jq -r '.last_price')
 	[ "$usd" == "null" ] && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na bitfinex" || { 
 		[ "${coin,,}" == "btc" ] && btc=1 || local btc=$(curl -s https://api.bitfinex.com/v1/pubticker/${coin}btc | jq -r '.last_price')
-		local msg="\`\`\`
+	(( qtd == 0 ))	&& local msg="\`\`\`
 Cotação BitFinex para ${coin^^}:
 USD $usd
 BTC $btc
 \`\`\`
-"
+" || local msg="\`\`\`
+${qtd} ${coin^^} valem:
+USD $(echo "$usd*$qtd" | bc )
+BTC $(echo "$btc*$qtd" | bc)
+\`\`\`"
+
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	}
 }
@@ -156,7 +162,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin [a-zA-Z0-9]+$" <<< "$command" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin( [a-zA-Z0-9]+){1,2}$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -190,7 +196,7 @@ commandlistener(){
 								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
-							/coin*) [ "${command}" != "$last" ] && { coin ${command/* }; atualizavar last "$command"; echo $command; } ;;
+							/coin*) [ "${command}" != "$last" ] && { coin ${command/\/coin /}; atualizavar last "$command"; echo $command; } ;;
 							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
