@@ -19,22 +19,48 @@ ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
 }
 parametros
 
+isAdmin(){
+	grep -q $1 <<< ${ADMINS[@]} && true || false
+}
+
+formata(){
+	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" ${1/./,}
+}
+
 coin() {
 	coin=$1
-	(( $# == 2 )) && qtd=$2 || qtd=0
-	local usd=$(curl -s https://api.bitfinex.com/v1/pubticker/${coin}usd | jq -r '.last_price')
-	[ "$usd" == "null" ] && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na bitfinex" || { 
-		[ "${coin,,}" == "btc" ] && btc=1 || local btc=$(curl -s https://api.bitfinex.com/v1/pubticker/${coin}btc | jq -r '.last_price')
-	(( qtd == 0 ))	&& local msg="\`\`\`
-Cotação BitFinex para ${coin^^}:
-USD $usd
+	(( $# == 2 )) \
+		&& qtd=$2 \
+		|| qtd=0
+	json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin | jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
+	echo "$json" | jq '.error' 2>/dev/null && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na coinmarketcap" || {
+	read usd btc change1h change24h symbol <<< $json
+	[[ $qtd =~ [^[:digit:]\.] ]] && qtd=0
+	[ "$qtd" == "0" ] && local msg="\`\`\`
+Cotação CoinMarketCap ara ${symbol^^}:
+USD $(formata $usd)
 BTC $btc
+24h: $change24h
+1h: $change1h
 \`\`\`
-" || local msg="\`\`\`
-${qtd} ${coin^^} valem:
-USD $(echo "$usd*$qtd" | bc )
+" || {
+	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
+	jq -r '"\(.sell) \(.high) \(.low)"')
+	read mbtc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
+	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read maior menor <<< $(echo "${foxbitsell/.*/},Foxbit
+${mbtc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
+	IFS=, read reais maiorexchange <<< $maior
+	local msg="\`\`\`
+${qtd} ${symbol^^} valem:
+${symbol^^} $btc (USD $(formata $usd))
+USD $(formata $(echo "$usd*$qtd" | bc ))
+BRL $(formata $(echo "$reais*$btc*$qtd" | bc))
 BTC $(echo "$btc*$qtd" | bc)
+24h: $change24h
+1h: $change1h
 \`\`\`"
+}
 
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	}
@@ -74,8 +100,6 @@ mensagem (){
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker_litecoin |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-#	read bitcambiobuy bitcambiosell <<< $(printf "%0.2f " $(curl -m5 -s "$bitcambiourl" |\
-#	jq -r '"\(.comprepor) \(.vendapor)"'))
 	read maior menor <<< $(echo "${foxbitsell/.*/},Foxbit
 ${btc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
 	IFS=, read maiorvlr maiorexchange <<< $maior
@@ -161,8 +185,8 @@ commandlistener(){
 		sed 's/ /|/g'); do
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
-			grep -Eoq "$USUARIOS" <<< "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin( [a-zA-Z0-9]+){1,2}$" <<< "$command" && {
+			isAdmin "$username" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin( [a-zA-Z0-9.-]+){1,2}$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -196,7 +220,9 @@ commandlistener(){
 								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
-							/coin*) [ "${command}" != "$last" ] && { coin ${command/\/coin /}; atualizavar last "$command"; echo $command; } ;;
+							/coin*) [ "${command}" != "$last" ] && { 
+								coin ${command/\/coin /};
+								atualizavar last "$command"; };
 							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
@@ -251,7 +277,6 @@ ${btc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
 *$maiorexchange ($maiorvlr) ${diff}% mais caro que $menorexchange ($menorvlr)*
 "
 	}
-#	echo "$msg"
 	(( ${#msg} > 2 )) && {
 		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	}
