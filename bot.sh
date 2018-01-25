@@ -76,7 +76,12 @@ ajuda() {
 */porcentagem 4.01*
 */parametros*
 */cotacoes*
-*/coin moeda*"
+*/coin moeda*
+*/coin moeda 1.3*
+*/adiciona moeda 30.3*
+*/remove moeda*
+*/consulta*
+"
 }
 
 read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  |\
@@ -198,9 +203,50 @@ remove(){
 consulta(){
 	dono=$1
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "Consultando moedas de @$dono"
-	while read line; do
-		coin $line
-	done < $dono.coins	
+	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
+	jq -r '"\(.sell) \(.high) \(.low)"')
+	read mbtc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
+	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	read maior menor <<< $(echo "${foxbitsell/.*/},Foxbit
+	${mbtc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
+	IFS=, read reais maiorexchange <<< $maior
+	msg=
+	totalreais=0
+	totaldolares=0
+	totalbtc=0
+	while read coin qtd; do
+		json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin | jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
+		echo "$json" | jq '.error' 2>/dev/null \
+		&& ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na coinmarketcap" \
+		|| {
+		read usd btc change1h change24h symbol <<< $json
+		reaist=$(echo "$reais*$btc*$qtd" | bc)
+		dolares=$(echo "$usd*$qtd" | bc)
+		totalreais=$(echo "scale=2; $totalreais+$reaist" | bc);
+		totaldolares=$(echo "scale=2; $totaldolares+$dolares" | bc);
+		totalbtc=$(echo "$totalbtc+$btc*$qtd"|bc)
+		local msg+="\`\`\`
+=========================
+${qtd} ${symbol^^} valem:
+${symbol^^} $btc (USD $(formata $usd))
+USD $(formata $dolares)
+BRL $(formata $reaist)
+BTC $(echo "$btc*$qtd" | bc)
+24h: $change24h
+1h: $change1h
+\`\`\`
+"
+}
+	
+	done < $dono.coins
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
+	stack="\`\`\`
+Totais para @${dono}:
+USD $(formata $totaldolares)
+BRL $(formata $totalreais)
+BTC ${totalbtc}\`\`\`"
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$stack"
+	
 }
 
 commandlistener(){
@@ -259,9 +305,9 @@ commandlistener(){
 							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
-							/adiciona*) adiciona $username ${command/\/adiciona /}; atualizavar last "$command";;
-							/remove*) remove $username ${command/\/remove /}; atualizavar last "$command";;
-							/consulta) consulta $username; atualizavar last "$command";;
+							/adiciona*) echo ${command/* /}; adiciona $username ${command/\/adiciona /}; atualizavar last "$command $username";;
+							/remove*) remove $username ${command/\/remove /}; atualizavar last "$command $username";;
+							/consulta) consulta $username; atualizavar last "$command $username";;
 						esac
 					}
 				}
