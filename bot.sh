@@ -37,7 +37,7 @@ coin() {
 	read usd btc change1h change24h symbol <<< $json
 	[[ $qtd =~ [^[:digit:]\.] ]] && qtd=0
 	[ "$qtd" == "0" ] && local msg="\`\`\`
-Cotação CoinMarketCap ara ${symbol^^}:
+Cotação CoinMarketCap para ${symbol^^}:
 USD $(formata $usd)
 BTC $btc
 24h: $change24h
@@ -170,6 +170,40 @@ alerta(){
 	fi
 }
 
+adiciona(){
+	(( $# != 3 )) && exit 1;
+	local dono=$1
+	local moeda=${2^^}
+	local quantidade=$3
+	echo $dono $moeda $quantidade
+	touch $dono.coins
+	[[ $quantidade =~ [^[:digit:]\.] ]] && exit 1
+	grep -qi "$moeda " $dono.coins && {
+		read moeda valor <<< $(grep -i "$moeda " $dono.coins);
+		quantidade=$(echo "$valor+$quantidade"| bc)
+		sed -i "s/$moeda .*/$moeda $quantidade/g" $dono.coins
+		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "Quantidade de $moeda atualizada para $quantidade para @$dono"
+	} || {
+		echo "${moeda} $quantidade" >> $dono.coins
+		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$quantidade $moeda adicionada para @$dono"
+	}
+}
+
+remove(){
+	dono=$1
+	moeda=${2^^}
+	sed -i "/$moeda/d" $dono.coins
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$moeda removida de @$dono"
+}
+
+consulta(){
+	dono=$1
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "Consultando moedas de @$dono"
+	while read line; do
+		coin $line
+	done < $dono.coins	
+}
+
 commandlistener(){
 	atualizavar() {
 		sed -i "s-$1.*-$1=\"$2\"-g" variaveis.sh
@@ -186,7 +220,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			isAdmin "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin( [a-zA-Z0-9.-]+){1,2}$" <<< "$command" && {
+				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin( [a-zA-Z0-9.-]+){1,2}$|^/adiciona [0-9a-zA-Z-]+ [0-9]+(\.[0-9]+)?$|^/remove [0-9a-zA-Z-]+$|^/consulta$" <<< "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
@@ -222,10 +256,13 @@ commandlistener(){
 							};;
 							/coin*) [ "${command}" != "$last" ] && { 
 								coin ${command/\/coin /};
-								atualizavar last "$command"; };
+								atualizavar last "$command"; };;
 							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
+							/adiciona*) echo ${command/* /}; adiciona $username ${command/\/adiciona /}; atualizavar last "$command";;
+							/remove*) remove $username ${command/\/remove /}; atualizavar last "$command";;
+							/consulta) consulta $username; atualizavar last "$command";;
 						esac
 					}
 				}
