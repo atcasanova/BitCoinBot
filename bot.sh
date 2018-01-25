@@ -175,7 +175,6 @@ adiciona(){
 	local dono=$1
 	local moeda=${2^^}
 	local quantidade=$3
-	echo $dono $moeda $quantidade
 	touch $dono.coins
 	[[ $quantidade =~ [^[:digit:]\.] ]] && exit 1
 	grep -qi "$moeda " $dono.coins && {
@@ -206,7 +205,7 @@ consulta(){
 
 commandlistener(){
 	atualizavar() {
-		sed -i "s-$1.*-$1=\"$2\"-g" variaveis.sh
+		sed -i "s%$1.*%$1=\"$2\"%g" variaveis.sh
 	}
 	envia(){
 		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$1"
