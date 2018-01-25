@@ -256,7 +256,12 @@ commandlistener(){
 							};;
 							/coin*) [ "${command}" != "$last" ] && { 
 								coin ${command/\/coin /};
+<<<<<<< HEAD
 								atualizavar last "$command"; };;
+=======
+								atualizavar last "$command"; 
+							};;
+>>>>>>> 7230fc4953eea15c04db7772956d8556d99f7785
 							/cotacoes) mensagem; atualizavar last "$command";;
 							/parametros) parametros $username; atualizavar last "$command";;
 							/help) ajuda $username; atualizavar last "$command";;
