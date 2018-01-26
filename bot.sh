@@ -23,6 +23,10 @@ isAdmin(){
 	grep -q $1 <<< ${ADMINS[@]} && true || false
 }
 
+isValidCommand(){
+	grep -Eoq "$COMANDOS" <<< "$1" && true || false
+}
+
 formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" ${1/./,}
 }
@@ -266,7 +270,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			isAdmin "$username" && {
-				grep -Eoq "^/cotacoes$|^/[lb]tcm[ai][xn] [0-9]+$|^/help$|^/parametros$|^/intervalo [0-9]+(\.[0-9])?$|^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|^/coin( [a-zA-Z0-9.-]+){1,2}$|^/adiciona [0-9a-zA-Z-]+ [0-9]+(\.[0-9]+)?$|^/remove [0-9a-zA-Z-]+$|^/consulta$" <<< "$command" && {
+				isValidCommand "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
 						echo $offset - $command - $last >> comandos.log
