@@ -1,6 +1,6 @@
 #!/bin/bash
 source ShellBot.sh
-. variaveis.sh
+source variaveis.sh
 
 foxbiturl="https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC"
 bitcambiourl="https://api.bitcambio.com.br/api/cotacao"
@@ -18,6 +18,10 @@ ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
 "
 }
 parametros
+
+envia(){
+	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$1"
+}
 
 isAdmin(){
 	grep -q $1 <<< ${ADMINS[@]} && true || false
@@ -37,7 +41,7 @@ coin() {
 		&& qtd=$2 \
 		|| qtd=0
 	json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin | jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
-	echo "$json" | jq '.error' 2>/dev/null && ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na coinmarketcap" || {
+	echo "$json" | jq '.error' 2>/dev/null && envia "${coin^^} não encontrada na coinmarketcap" || {
 	read usd btc change1h change24h symbol <<< $json
 	[[ $qtd =~ [^[:digit:]\.] ]] && qtd=0
 	[ "$qtd" == "0" ] && local msg="\`\`\`
@@ -65,13 +69,12 @@ BTC $(echo "$btc*$qtd" | bc)
 1h: $change1h
 \`\`\`"
 }
-
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
+	envia "$msg"
 	}
 }
 
 ajuda() {
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Comandos aceitos:
+	envia "@${1}, Comandos aceitos:
 */ltcmax 170*
 */ltcmin 110*
 */btcmax 9500*
@@ -114,7 +117,6 @@ ${btc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
 	IFS=, read maiorvlr maiorexchange <<< $maior
 	IFS=, read menorvlr menorexchange <<< $menor
 	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
-
 	msg="*Bitcoin: *
 *MercadoBTC:* R\$ $btc
 (*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|\
@@ -142,17 +144,19 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 grep -Eo "[0-9]*\.[0-9]{2}")%
 "
 	(( ${#msg} > 2 )) && { 
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
-		ShellBot.sendMessage --parse_mode markdown --disable_notification true --chat_id 424845561 --text "$msg"
+		envia "$msg"
 	}
 	[ -s $(date "+%Y%m%d").dat ] && {
-		[ -s $(date "+%Y%m%d" --date="1 day ago").dat ] && cat $(date "+%Y%m%d" --date="1 day ago").dat >> /historico.dat
+		[ -s $(date "+%Y%m%d" --date="1 day ago").dat ] \
+		&& cat $(date "+%Y%m%d" --date="1 day ago").dat >> /historico.dat
 		maior=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | tail -1)
 		menor=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | head -1)
 		sed -i "s/set yrange.*/set yrange [ $((${menor/.*/}*95/100)):$((${maior/.*/}*105/100))]/g" geraimagem.pb
 		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
-		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png | jq -r '.result.photo[] | .file_id' | tail -1)
-		curl -s -X POST "$apiurl/sendPhoto" -F disable_notification=true -F chat_id=424845561 -F photo=$idphoto >/dev/null
+		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
+		jq -r '.result.photo[] | .file_id' | tail -1)
+		curl -s -X POST "$apiurl/sendPhoto" -F disable_notification=true -F \
+		chat_id=424845561 -F photo=$idphoto >/dev/null
 	}
 }
 
@@ -190,10 +194,10 @@ adiciona(){
 		read moeda valor <<< $(grep -i "$moeda " $dono.coins);
 		quantidade=$(echo "$valor+$quantidade"| bc)
 		sed -i "s/$moeda .*/$moeda $quantidade/g" $dono.coins
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "Quantidade de $moeda atualizada para $quantidade para @$dono"
+		envia "Quantidade de $moeda atualizada para $quantidade para @$dono"
 	} || {
 		echo "${moeda} $quantidade" >> $dono.coins
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$quantidade $moeda adicionada para @$dono"
+		envia "$quantidade $moeda adicionada para @$dono"
 	}
 }
 
@@ -202,13 +206,13 @@ remove(){
 	moeda=${2^^}
 	grep $moeda $dono.coins && {
 		sed -i "/$moeda/d" $dono.coins
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$moeda removida de @$dono"
-	} || ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@$dono não tem $moeda"
+		envia "$moeda removida de @$dono"
+	} || envia "@$dono não tem $moeda"
 }
 
 consulta(){
 	dono=$1
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "Consultando moedas de @$dono"
+	envia "Consultando moedas de @$dono"
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
 	jq -r '"\(.sell) \(.high) \(.low)"')
 	read mbtc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ticker |\
@@ -221,9 +225,10 @@ consulta(){
 	totaldolares=0
 	totalbtc=0
 	while read coin qtd; do
-		json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin | jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
+		json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin |\
+		 jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
 		echo "$json" | jq '.error' 2>/dev/null \
-		&& ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "${coin^^} não encontrada na coinmarketcap" \
+		&& envia "${coin^^} não encontrada na coinmarketcap" \
 		|| {
 		read usd btc change1h change24h symbol <<< $json
 		reaist=$(echo "$reais*$btc*$qtd" | bc)
@@ -244,22 +249,19 @@ BTC $(echo "$btc*$qtd" | bc)
 "
 }
 	done < $dono.coins
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
+	envia "$msg"
 	stack="\`\`\`
 Totais para @${dono}:
 USD $(formata $totaldolares)
 BRL $(formata $totalreais)
 BTC ${totalbtc}\`\`\`"
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$stack"
+	envia "$stack"
 	
 }
 
 commandlistener(){
 	atualizavar() {
 		sed -i "s%$1.*%$1=\"$2\"%g" variaveis.sh
-	}
-	envia(){
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$1"
 	}
 	last=oe
 	while : ; do
@@ -371,7 +373,7 @@ ${btc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
 "
 	}
 	(( ${#msg} > 2 )) && {
-		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
+		envia "$msg"
 	}
 	[ ! -s $(date "+%Y%m%d").dat ] && echo "##hora valor" > $(date "+%Y%m%d").dat
 	read gmbtc gfoxbit btcusd <<< "${btc:-0} ${foxbitsell:-0} ${btcusd:-0}"
