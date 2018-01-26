@@ -196,8 +196,10 @@ adiciona(){
 remove(){
 	dono=$1
 	moeda=${2^^}
-	sed -i "/$moeda/d" $dono.coins
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$moeda removida de @$dono"
+	grep $moeda $dono.coins && {
+		sed -i "/$moeda/d" $dono.coins
+		ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$moeda removida de @$dono"
+	} || ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@$dono não tem $moeda"
 }
 
 consulta(){
@@ -237,7 +239,6 @@ BTC $(echo "$btc*$qtd" | bc)
 \`\`\`
 "
 }
-	
 	done < $dono.coins
 	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$msg"
 	stack="\`\`\`
@@ -302,12 +303,18 @@ commandlistener(){
 							/coin*) [ "${command}" != "$last" ] && { 
 								coin ${command/\/coin /};
 								atualizavar last "$command"; };;
-							/cotacoes) mensagem; atualizavar last "$command";;
-							/parametros) parametros $username; atualizavar last "$command";;
-							/help) ajuda $username; atualizavar last "$command";;
-							/adiciona*) echo ${command/* /}; adiciona $username ${command/\/adiciona /}; atualizavar last "$command $username";;
-							/remove*) remove $username ${command/\/remove /}; atualizavar last "$command $username";;
-							/consulta) consulta $username; atualizavar last "$command $username";;
+							/cotacoes) mensagem; 
+								atualizavar last "$command";;
+							/parametros) parametros $username; 
+								atualizavar last "$command";;
+							/help) ajuda $username; 
+								atualizavar last "$command";;
+							/adiciona*) adiciona $username ${command/\/adiciona /};
+								atualizavar last "$command $username";;
+							/remove*) remove $username ${command/\/remove /};
+								atualizavar last "$command $username";;
+							/consulta) consulta $username;
+								atualizavar last "$command $username";;
 						esac
 					}
 				}
