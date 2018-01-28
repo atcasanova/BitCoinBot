@@ -189,7 +189,7 @@ adiciona(){
 	local moeda=${2^^}
 	local quantidade=$3
 	touch $dono.coins
-	[[ $quantidade =~ [^[:digit:]\.] ]] && exit 1
+	[[ $quantidade =~ [^[:digit:]\.-] ]] && exit 1
 	grep -qi "$moeda " $dono.coins && {
 		read moeda valor <<< $(grep -i "$moeda " $dono.coins);
 		quantidade=$(echo "$valor+$quantidade"| bc)
