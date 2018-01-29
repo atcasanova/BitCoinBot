@@ -40,7 +40,8 @@ coin() {
 	(( $# == 2 )) \
 		&& qtd=$2 \
 		|| qtd=0
-	json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin | jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
+	json="$(curl -sL $coinmarketcap/$coin \
+	| jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
 	echo "$json" | jq '.error' 2>/dev/null && envia "${coin^^} não encontrada na coinmarketcap" || {
 	read usd btc change1h change24h symbol <<< $json
 	[[ $qtd =~ [^[:digit:]\.] ]] && qtd=0
@@ -225,18 +226,18 @@ consulta(){
 	totaldolares=0
 	totalbtc=0
 	while read coin qtd; do
-		json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin |\
+		json="$(curl -sL $coinmarketcap/$coin |\
 		jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
 		echo "$json" | jq '.error' 2>/dev/null \
 		&& envia "${coin^^} não encontrada na coinmarketcap" \
 		|| {
-		read usd btc change1h change24h symbol <<< $json
-		reaist=$(echo "$reais*$btc*$qtd" | bc)
-		dolares=$(echo "$usd*$qtd" | bc)
-		totalreais=$(echo "scale=2; $totalreais+$reaist" | bc);
-		totaldolares=$(echo "scale=2; $totaldolares+$dolares" | bc);
-		totalbtc=$(echo "$totalbtc+$btc*$qtd"|bc)
-		local msg+="\`\`\`
+			read usd btc change1h change24h symbol <<< $json
+			reaist=$(echo "$reais*$btc*$qtd" | bc)
+			dolares=$(echo "$usd*$qtd" | bc)
+			totalreais=$(echo "scale=2; $totalreais+$reaist" | bc);
+			totaldolares=$(echo "scale=2; $totaldolares+$dolares" | bc);
+			totalbtc=$(echo "$totalbtc+$btc*$qtd"|bc)
+			local msg+="\`\`\`
 =========================
 ${qtd} ${symbol^^} valem:
 ${symbol^^} $btc (USD $(formata $usd))
@@ -247,7 +248,7 @@ BTC $(echo "$btc*$qtd" | bc)
 1h: $change1h
 \`\`\`
 "
-}
+		}
 	done < $dono.coins
 	envia "$msg"
 	stack="Totais para @${dono}:
