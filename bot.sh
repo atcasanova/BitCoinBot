@@ -1,15 +1,14 @@
 #!/bin/bash
 source variaveis.sh
 
-foxbiturl="https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC"
-apiurl="https://api.telegram.org/bot$TOKEN"
-mbtc=https://www.mercadobitcoin.net/api
 ct=0
 curl -s $apiurl/getMe 2>&1 >/dev/null
 
 envia(){
 	source variaveis.sh
-	curl -s -X POST "$apiurl/sendMessage" -F text="$*" -F parse_mode="markdown" -F chat_id=$CHATID 2>&1 >/dev/null 
+	curl -s -X POST "$apiurl/sendMessage" \
+	-F text="$*" -F parse_mode="markdown" \
+	-F chat_id=$CHATID 2>&1 >/dev/null 
 }
 
 parametros(){
