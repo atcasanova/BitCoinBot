@@ -185,25 +185,31 @@ alerta(){
 
 adiciona(){
 	(( $# != 3 )) && exit 1;
-	local dono=$1
-	local moeda=${2^^}
-	local quantidade=$3
+	local dono=$3
+	local coin=${1^^}
+	local quantidade=$2
 	touch $dono.coins
-	[[ $quantidade =~ [^[:digit:]\.-] ]] && exit 1
-	grep -qi "^$moeda " $dono.coins && {
-		read moeda valor <<< $(grep -i "$moeda " $dono.coins);
-		quantidade=$(echo "$valor+$quantidade"| bc)
-		sed -i "s/$moeda .*/$moeda $quantidade/g" $dono.coins
-		envia "Quantidade de $moeda atualizada para $quantidade para @$dono"
-	} || {
-		echo "${moeda} $quantidade" >> $dono.coins
-		envia "$quantidade $moeda adicionada para @$dono"
+	[[ $quantidade =~ [^[:digit:]\.-] ]] || {
+		json="$(curl -sL $coinmarketcap/$coin \
+		| jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
+		echo "$json" | jq '.error' 2>/dev/null && envia "${coin^^} não encontrada na coinmarketcap" || {
+			grep -qi "^$coin " $dono.coins && {
+				read moeda valor <<< $(grep -i "$coin " $dono.coins);
+				quantidade=$(echo "$valor+$quantidade"| bc)
+				sed -i "s/$coin .*/$coin $quantidade/g" $dono.coins
+				envia "Quantidade de $coin atualizada para $quantidade para @$dono"
+			} || {
+				echo "${coin} $quantidade" >> $dono.coins
+				envia "$quantidade $coin adicionada para @$dono"
+			}
+			coin $coin $quantidade
+		}
 	}
 }
 
 remove(){
-	dono=$1
-	moeda=${2^^}
+	dono=$2
+	moeda=${1^^}
 	touch $dono.coins
 	grep -q "^$moeda " $dono.coins && {
 		sed -i "/$moeda/d" $dono.coins
@@ -277,7 +283,7 @@ commandlistener(){
 				isValidCommand "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
-						echo $offset - $command - $last >> comandos.log
+						echo $offset - @$username - $command - $last >> comandos.log
 						case $command in 
 							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
 								envia "@${username}, setando *LTCMAX* para ${command/* /}";
@@ -318,12 +324,15 @@ commandlistener(){
 								atualizavar last "$command";;
 							/help) ajuda $username; 
 								atualizavar last "$command";;
-							/adiciona*) adiciona $username ${command/\/adiciona /};
-								atualizavar last "$command $username";;
-							/remove*) remove $username ${command/\/remove /};
-								atualizavar last "$command $username";;
+							/adiciona*) adiciona ${command/\/adiciona /} $username;
+								command="$command $username";
+								atualizavar last "$command";;
+							/remove*) remove ${command/\/remove /} $username;
+								command="$command $username";
+								atualizavar last "$command";;
 							/consulta) consulta $username;
-								atualizavar last "$command $username";;
+								command="$command $username";
+								atualizavar last "$command";;
 						esac
 					}
 				}
