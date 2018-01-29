@@ -1,26 +1,28 @@
 #!/bin/bash
-source ShellBot.sh
 source variaveis.sh
 
 foxbiturl="https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC"
 apiurl="https://api.telegram.org/bot$TOKEN"
 mbtc=https://www.mercadobitcoin.net/api
 ct=0
-ShellBot.init --token $TOKEN
-parametros() {
+curl -s $apiurl/getMe 2>&1 >/dev/null
+
+envia(){
 	source variaveis.sh
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "@${1}, Parâmetros:
+	curl -s -X POST "$apiurl/sendMessage" -F text="$*" -F parse_mode="markdown" -F chat_id=$CHATID 2>&1 >/dev/null 
+}
+
+parametros(){
+	local mensagem="Parâmetros:
 BTC: > $BTCMAX e < $BTCMIN
 LTC: > $LTCMAX e < $LTCMIN
 CHECAGEM A CADA $INTERVALO minutos
 ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
 "
+	envia "$mensagem"
 }
-parametros
 
-envia(){
-	ShellBot.sendMessage --parse_mode markdown --chat_id $CHATID --text "$1"
-}
+parametros
 
 isAdmin(){
 	grep -q $1 <<< ${ADMINS[@]} && true || false
@@ -72,8 +74,8 @@ BTC $(echo "$btc*$qtd" | bc)
 	}
 }
 
-ajuda() {
-	envia "@${1}, Comandos aceitos:
+ajuda(){
+	local mensagem="Comandos aceitos:
 */ltcmax 170*
 */ltcmin 110*
 */btcmax 9500*
@@ -88,6 +90,7 @@ ajuda() {
 */remove moeda*
 */consulta*
 "
+	envia "$mensagem"
 }
 
 read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  |\
@@ -154,8 +157,6 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
 		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
 		jq -r '.result.photo[] | .file_id' | tail -1)
-		curl -s -X POST "$apiurl/sendPhoto" -F disable_notification=true -F \
-		chat_id=424845561 -F photo=$idphoto >/dev/null
 	}
 }
 
