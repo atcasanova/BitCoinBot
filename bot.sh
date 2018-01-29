@@ -3,7 +3,6 @@ source ShellBot.sh
 source variaveis.sh
 
 foxbiturl="https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC"
-bitcambiourl="https://api.bitcambio.com.br/api/cotacao"
 apiurl="https://api.telegram.org/bot$TOKEN"
 mbtc=https://www.mercadobitcoin.net/api
 ct=0
@@ -190,7 +189,7 @@ adiciona(){
 	local quantidade=$3
 	touch $dono.coins
 	[[ $quantidade =~ [^[:digit:]\.-] ]] && exit 1
-	grep -qi "$moeda " $dono.coins && {
+	grep -qi "^$moeda " $dono.coins && {
 		read moeda valor <<< $(grep -i "$moeda " $dono.coins);
 		quantidade=$(echo "$valor+$quantidade"| bc)
 		sed -i "s/$moeda .*/$moeda $quantidade/g" $dono.coins
@@ -204,7 +203,8 @@ adiciona(){
 remove(){
 	dono=$1
 	moeda=${2^^}
-	grep $moeda $dono.coins && {
+	touch $dono.coins
+	grep -q "^$moeda " $dono.coins && {
 		sed -i "/$moeda/d" $dono.coins
 		envia "$moeda removida de @$dono"
 	} || envia "@$dono não tem $moeda"
@@ -226,7 +226,7 @@ consulta(){
 	totalbtc=0
 	while read coin qtd; do
 		json="$(curl -sL https://api.coinmarketcap.com/v1/ticker/$coin |\
-		 jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
+		jq -r '"\(.[].price_usd) \(.[].price_btc) \(.[].percent_change_1h) \(.[].percent_change_24h) \(.[].symbol)"')"
 		echo "$json" | jq '.error' 2>/dev/null \
 		&& envia "${coin^^} não encontrada na coinmarketcap" \
 		|| {
@@ -250,8 +250,8 @@ BTC $(echo "$btc*$qtd" | bc)
 }
 	done < $dono.coins
 	envia "$msg"
-	stack="\`\`\`
-Totais para @${dono}:
+	stack="Totais para @${dono}:
+\`\`\`
 USD $(formata $totaldolares)
 BRL $(formata $totalreais)
 BTC ${totalbtc}\`\`\`"
@@ -265,7 +265,7 @@ commandlistener(){
 	}
 	last=oe
 	while : ; do
-		. variaveis.sh
+		source variaveis.sh
 		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
 		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
 		sed 's/ /|/g'); do
@@ -279,7 +279,8 @@ commandlistener(){
 						case $command in 
 							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
 								envia "@${username}, setando *LTCMAX* para ${command/* /}";
-								atualizavar LTCMAX ${command/* /}; atualizavar last "$command"; 
+								atualizavar LTCMAX ${command/* /}; 
+								atualizavar last "$command";
 							};;
 							/ltcmin*) (( ${command/* /} != $LTCMIN )) && {
 								envia "@${username}, setando *LTCMIN* para ${command/* /}";
