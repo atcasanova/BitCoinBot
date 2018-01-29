@@ -273,6 +273,7 @@ commandlistener(){
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			isAdmin "$username" && {
+				command=${command%%@*}
 				isValidCommand "$command" && {
 					source variaveis.sh
 					[ "$command" != "$last" ] && {
