@@ -24,11 +24,11 @@ ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
 parametros
 
 isAdmin(){
-	grep -q $1 <<< ${ADMINS[@]} && true || false
+	grep -q $1 <<< "${ADMINS[@]}"
 }
 
 isValidCommand(){
-	grep -Eoq "$COMANDOS" <<< "$1" && true || false
+	grep -Eoq "$COMANDOS" <<< "$1"
 }
 
 formata(){
