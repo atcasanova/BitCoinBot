@@ -275,7 +275,7 @@ commandlistener(){
 		source variaveis.sh
 		for comando in $(curl -s  -X POST --data "offset=$((offset+1))" "$apiurl/getUpdates" |\
 		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
-		sed 's/ /|/g'); do
+		sed 's/ /|/g' | sort | uniq); do
 			read offset username command <<< $(echo $comando | sed 's/|/ /g')
 			shopt -s extglob
 			isAdmin "$username" && {
@@ -326,12 +326,15 @@ commandlistener(){
 								atualizavar last "$command";;
 							/adiciona*) adiciona ${command/\/adiciona /} $username;
 								command="$command $username";
+								echo $command;
 								atualizavar last "$command";;
 							/remove*) remove ${command/\/remove /} $username;
 								command="$command $username";
+								echo $command;
 								atualizavar last "$command";;
 							/consulta) consulta $username;
 								command="$command $username";
+								echo $command;
 								atualizavar last "$command";;
 						esac
 					}
