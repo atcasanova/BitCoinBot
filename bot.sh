@@ -106,7 +106,7 @@ mensagem (){
 	jq -r '"\(.sell) \(.high) \(.low)"')
 	dolarbb=$(wget -qO- https://internacional.bb.com.br/displayRatesBR.bb | grep -iEA1 "real.*Dólar" | tail -1 |\
 	grep -Eo "[0-9]\.[0-9]+")
-	xapo=$(printf "%0.2f" $(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt'))
+	xapo=$(printf "%0.2f" $(curl -sL $coinmarketcap/bitcoin | jq -r '"\(.[].price_usd)"'))
 	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
 	dolar3000=$(echo "scale=4; ${dolarbb:-0}*1.0664" | bc)
 	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
@@ -356,7 +356,7 @@ do
 	source variaveis.sh
 	msg=
 	
-	tmp=$(wget -qO- https://api.xapo.com/v3/quotes/BTCUSD | jq '.fx_etoe.BTCUSD.destination_amt')
+	tmp=$(curl -sL $coinmarketcap/bitcoin | jq -r '"\(.[].price_usd)"' )
 	xapo=$(printf "%0.2f " ${tmp:-$xapo})
 	tmp=$(wget -qO- $mbtc/ticker |jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"')
 	read btc btchigh btclow <<< $(printf "%0.2f " ${tmp:-$btc $btchigh $btclow})
