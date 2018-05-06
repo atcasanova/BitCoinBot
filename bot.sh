@@ -129,7 +129,7 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 
 *( Diferença: $maiorexchange ${diff:-0}% mais caro que $menorexchange )*
 
-*Xapo:* USD $xapo
+*BTCUSD:* USD $xapo
 
 *Custo Dolar BB -> Xapo*: 
 *USD 2000*: $dolar2000
@@ -138,7 +138,7 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 "
 	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
 	msg+="
-*$maiorexchange/Xapo:* $rate
+*$maiorexchange/BTCUSD:* $rate
 "
 	msg+="
 *Litecoin:* R\$ $ltc
@@ -214,10 +214,11 @@ remove(){
 	grep -q "^$moeda " $dono.coins && {
 		sed -i "/$moeda/d" $dono.coins
 		envia "$moeda removida de @$dono"
-	} || envia "@$dono não tem $moeda"
+	} || envia "$dono não tem $moeda"
 }
 
 consulta(){
+	lista=
 	dono=$1
 	envia "Consultando moedas de @$dono"
 	read foxbitsell foxbithigh foxbitlow <<< $(curl -s "$foxbiturl" |\
@@ -254,6 +255,9 @@ BTC $(echo "$btc*$qtd" | bc)
 1h: $change1h
 \`\`\`
 "
+	lista+="$reaist,${symbol^^}
+"
+echo "$lista"
 		}
 	done < $dono.coins
 	envia "$msg"
@@ -264,6 +268,22 @@ BRL $(formata $totalreais)
 BTC ${totalbtc}\`\`\`"
 	envia "$stack"
 	
+	lista=$(echo "${lista::-1}"| sort -nr)
+	argvalor= 
+	argmoeda=
+	while IFS=, read valor moeda; do
+		echo "scale=2; (100*$valor)/$totalreais"
+		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
+		argvalor+="$percent,"
+		argmoeda+="${moeda^^}|"
+	done <<< "${lista}"
+	argvalor=${argvalor::-1}
+	argmoeda=${argmoeda::-1}
+	cores=$(cat $dono.coins | wc -l)
+	
+	wget "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x500&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a" -Ograph.png
+	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
+        jq -r '.result.photo[] | .file_id' | tail -1)
 }
 
 commandlistener(){
@@ -286,32 +306,32 @@ commandlistener(){
 						echo $offset - @$username - $command - $last >> comandos.log
 						case $command in 
 							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
-								envia "@${username}, setando *LTCMAX* para ${command/* /}";
+								envia "${username}, setando *LTCMAX* para ${command/* /}";
 								atualizavar LTCMAX ${command/* /}; 
 								atualizavar last "$command";
 							};;
 							/ltcmin*) (( ${command/* /} != $LTCMIN )) && {
-								envia "@${username}, setando *LTCMIN* para ${command/* /}";
+								envia "${username}, setando *LTCMIN* para ${command/* /}";
 								atualizavar LTCMIN ${command/* /};
 								atualizavar last "$command"; 
 							};;
 							/btcmax*) (( ${command/* /} != $BTCMAX )) && {
-								envia "@${username}, setando *BTCMAX* para ${command/* /}";
+								envia "${username}, setando *BTCMAX* para ${command/* /}";
 								atualizavar BTCMAX ${command/* /};
 								atualizavar last "$command";
 							};;
 							/btcmin*) (( ${command/* /} != $BTCMIN )) && {
-								envia "@${username}, setando *BTCMIN* para ${command/* /}";
+								envia "${username}, setando *BTCMIN* para ${command/* /}";
 								atualizavar BTCMIN ${command/* /};
 								atualizavar last "$command";
 							};;
 							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && {
-								envia "@${username}, setando *intervalo* para ${command/* /} minutos";
+								envia "${username}, setando *intervalo* para ${command/* /} minutos";
 								atualizavar INTERVALO ${command/* /};
 								atualizavar last "$command";
 							};;
 							/porcentagem*) [ "${command/* /}" != "$PORCENTAGEM" ] && {
-								envia "@${username}, setando *porcentagem* para ${command/* /}%";
+								envia "${username}, setando *porcentagem* para ${command/* /}%";
 								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
@@ -379,7 +399,7 @@ ${btc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
 	btcusd=$(echo "scale=2; $xapo*$dolar"|bc)
 	(( $(echo "${rate} >= ${PORCENTAGEM}"|bc) == 1 )) && {
 		msg+="
-*$maiorexchange/Xapo:* $rate ($btc/$xapo)"
+*$maiorexchange/BTCUSD:* $rate ($btc/$xapo)"
 	}
 	diff=${diff:-0}
 	(( $(echo "${diff} >= ${PORCENTAGEM}"|bc) == 1 )) && {
