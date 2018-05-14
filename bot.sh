@@ -255,9 +255,8 @@ BTC $(echo "$btc*$qtd" | bc)
 1h: $change1h
 \`\`\`
 "
-	lista+="$reaist,${symbol^^}
+			lista+="$reaist,${symbol^^}
 "
-echo "$lista"
 		}
 	done < $dono.coins
 	envia "$msg"
@@ -271,18 +270,22 @@ BTC ${totalbtc}\`\`\`"
 	lista=$(echo "${lista::-1}"| sort -nr)
 	argvalor= 
 	argmoeda=
+	arglabel=
 	while IFS=, read valor moeda; do
 		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
 		argvalor+="$percent,"
 		argmoeda+="${moeda^^} R\$ $(formata $valor)|"
+		arglabel+="${percent}%|"
 	done <<< "${lista}"
 	argvalor=${argvalor::-1}
 	argmoeda=${argmoeda::-1}
+	arglabel=${arglabel::-1}
 	cores=$(cat $dono.coins | wc -l)
 	
-	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x500&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a&chtt=$dono BRL $(formata $totalreais)" -Ograph.png
+	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
 	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
         jq -r '.result.photo[] | .file_id' | tail -1)
+	mv graph.png history/$dono.$(date "+%Y%m%d-%Hh%M").png
 }
 
 commandlistener(){
