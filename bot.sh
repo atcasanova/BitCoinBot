@@ -274,7 +274,8 @@ BTC ${totalbtc}\`\`\`"
 	while IFS=, read valor moeda; do
 		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
 		argvalor+="$percent,"
-		argmoeda+="${moeda^^} R\$ $(formata $valor)|"
+		valor=$(formata $valor)
+		argmoeda+="${moeda^^} R\$ ${valor::-3}|"
 		arglabel+="${percent}%|"
 	done <<< "${lista}"
 	argvalor=${argvalor::-1}
