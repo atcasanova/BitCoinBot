@@ -372,7 +372,7 @@ commandlistener &
 
 while : 
 do
-	dolar=$(curl -s "https://finance.google.com/finance/converter?a=1&from=USD&to=BRL&meta=ei%3DJCL7WfnFL428e6vMn5AL"|grep result | grep -Eo "[0-9]\.[0-9]+" || echo $dolar)
+	dolar=$(curl -s "http://free.currencyconverterapi.com/api/v5/convert?q=USD_BRL&compact=y"| jq '.USD_BRL.val')
 	let ct+=1
 	(( ct % 12 == 0 )) && { mensagem; sed -i "s/last=.*/last=oe/g" variaveis.sh ; }
 	sleep ${INTERVALO}m
