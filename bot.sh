@@ -292,15 +292,19 @@ BTC ${totalbtc}\`\`\`"
 
 evolucao(){
 	dono=$1
-	arg=
-	while IFS=, read data valor; do
-		arg+=$valor,
-	done < $dono.history
-	arg=${arg::-1}
-	wget -q "https://chart.googleapis.com/chart?cht=lc&chd=t:$arg&chs=600x500&chtt=Evolução%20do%20Stack%20de%20$dono&chxt=y&chds=a&chg=10,10" -Oout.png
-	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
-	jq -r '.result.photo[] | .file_id' | tail -1)
-	rm out.png
+	[ -s $dono.history ] && {
+		envia "Nao ha dados para $dono. Use /consulta antes";
+	} || {
+		arg=
+		while IFS=, read data valor; do
+			arg+=$valor,
+		done < $dono.history
+		arg=${arg::-1}
+		wget -q "https://chart.googleapis.com/chart?cht=lc&chd=t:$arg&chs=600x500&chtt=Evolução%20do%20Stack%20de%20$dono&chxt=y&chds=a&chg=10,10" -Oout.png
+		grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
+		jq -r '.result.photo[] | .file_id' | tail -1)
+		rm out.png
+	}
 }
 
 commandlistener(){
