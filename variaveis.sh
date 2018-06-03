@@ -21,5 +21,6 @@ COMANDOS="^/cotacoes$|\
 ^/coin( [a-zA-Z0-9.-]+){1,2}$|\
 ^/adiciona [0-9a-zA-Z-]+ -?[0-9]+(\.[0-9]+)?$|\
 ^/remove [0-9a-zA-Z-]+$|\
-^/consulta$"
+^/consulta$|\
+^/evolucao$"
 
