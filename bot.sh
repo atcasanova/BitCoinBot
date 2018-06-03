@@ -292,7 +292,7 @@ BTC ${totalbtc}\`\`\`"
 
 evolucao(){
 	dono=$1
-	[ -s $dono.history ] && {
+	[ ! -s $dono.history ] && {
 		envia "Nao ha dados para $dono. Use /consulta antes";
 	} || {
 		arg=
