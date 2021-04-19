@@ -35,6 +35,7 @@ formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" ${1/./,}
 }
 
+
 coin() {
 	coin=${1^^}
 	(( $# == 2 )) \
@@ -178,7 +179,7 @@ alerta(){
 }
 
 adiciona(){
-	(( $# != 3 )) && exit 1;
+	(( $# != 3 )) && return 1;
 	local dono=$3
 	local coin=${1^^}
 	local quantidade=$2
@@ -210,6 +211,71 @@ remove(){
 	} || envia "$dono não tem $moeda"
 }
 
+
+binance(){
+	[ -f .binancelock ] && { envia "Usuario $(cat .binancelock) já está consultando. Espere sua vez, fominha"; return 1; }
+	local dono=$1
+	echo "@$dono" > .binancelock
+	local lista=
+	local usdt=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL" |jq -r '.price')
+	local btc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCBRL" |jq  -r '.price')
+	envia "Consultando valores de @$dono na binance baseado em USDT (1 USDT = $usdt BRL)"
+	totalreais=0
+	totaldolares=0
+	while read coin qtd; do
+		cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
+		grep -qE "([0-9]+)?\.[0-9]+" <<< $cotacao || { envia "${coin^^} nao encontrada na Binance"; continue; }
+		value=$(echo "scale=2; $cotacao*$qtd"| bc);
+		brl=$(echo "scale=2; $value*$usdt"|bc);
+		totaldolares=$(echo "scale=2; $totaldolares+$value" | bc)
+		totalreais=$(echo "scale=2; $totalreais+$brl" | bc)
+		local msg+="\`\`\`
+=========================
+${qtd} ${coin^^} valem:
+${coin^^} $btc (USDT $(formata $cotacao))
+USDT $(formata $value)
+BRL $(formata $brl)
+\`\`\`
+"	
+		lista+="$brl,${coin^^}
+"
+	done < $dono.coins
+	envia "$msg"
+	totalbtc=$(echo "$totalreais/$btc"|bc -l)	
+	stack="Totais para @${dono}:
+\`\`\`
+USD $(formata $totaldolares)
+BRL $(formata $totalreais)
+BTC $totalbtc
+\`\`\`
+"
+	envia "$stack"
+	lista=$(echo "${lista::-1}"| sort -nr)
+	argvalor= 
+	argmoeda=
+	arglabel=
+	while IFS=, read valor moeda; do
+		echo buscando $moeda
+		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
+		argvalor+="$percent,"
+		valor=$(formata $valor)
+		argmoeda+="${moeda^^} R\$ ${valor::-3}|"
+		arglabel+="${percent}%|"
+	done <<< "${lista}"
+	argvalor=${argvalor::-1}
+	argmoeda=${argmoeda::-1}
+	arglabel=${arglabel::-1}
+	cores=$(cat $dono.coins | wc -l)
+	
+	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
+	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
+        jq -r '.result.photo[] | .file_id' | tail -1)
+	rm .binancelock -f
+#	mv graph.png history/$dono.$(date "+%Y%m%d-%Hh%M").png
+}
+
+
+
 consulta(){
 	lista=
 	dono=$1
@@ -226,7 +292,13 @@ consulta(){
 	totaldolares=0
 	totalbtc=0
 	while read coin qtd; do
-		json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
+		json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" \
+			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin \
+			| jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") \
+				$(curl -sH "$COINMARKET" \
+				-H "Accept: application/json" \
+				"https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" \
+				| jq -r ".data.$coin.quote.BTC.price") $coin")"
 		grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 			read usd change1h change24h btc symbol <<< $json
 			grep -q "e" <<< "$btc" && btc=$(echo "$btc"|sed 's/e/*10^/'|bc -l)
@@ -270,9 +342,7 @@ BTC ${totalbtc}\`\`\`"
 		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
 		argvalor+="$percent,"
 		valor=$(formata $valor)
-#		echo "$valor valor ============================================================="
 		argmoeda+="${moeda^^} R\$ ${valor::-3}|"
-#		echo "$argmoeda argmoeda ========================================================"
 		arglabel+="${percent}%|"
 	done <<< "${lista}"
 	argvalor=${argvalor::-1}
@@ -302,7 +372,7 @@ evolucao(){
 			wget -q --post-data="cht=lc&chd=t:$arg&chs=600x500&chtt=Evolução%20do%20Stack%20de%20$dono&chxt=y&chds=a&chg=10,10" "https://chart.googleapis.com/chart" -Oout.png
 			grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
 			jq -r '.result.photo[] | .file_id' | tail -1)
-			rm out.png
+#			rm out.png
 		}
 	}
 }
@@ -374,6 +444,10 @@ commandlistener(){
 								echo $command;
 								atualizavar last "$command";;
 							/consulta) consulta $username;
+								command="$command $username";
+								echo $command;
+								atualizavar last "$command";;
+							/binance) binance $username;
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
