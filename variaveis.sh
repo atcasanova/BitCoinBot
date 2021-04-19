@@ -22,5 +22,6 @@ COMANDOS="^/cotacoes$|\
 ^/adiciona [0-9a-zA-Z-]+ -?[0-9]+(\.[0-9]+)?$|\
 ^/remove [0-9a-zA-Z-]+$|\
 ^/consulta$|\
-^/evolucao$"
+^/evolucao$|\
+^/binance$"
 
