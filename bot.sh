@@ -43,7 +43,8 @@ coin() {
 		|| qtd=0
 	json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
 	cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
-
+	local img=$(curl -s https://coinmarketcap.com | grep -Po "font-size=\"1\">${coin^^}.*(?=(alt=\"[0-9]+-price-graph))"| sed 's/price-graph/\n/g'| head -1| grep -Eo "https://.*png")
+	(( ${#img} > 5 )) && wget -q "$img" -O ${coin^^}.png
 	grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 	read usd change1h change24h btc symbol <<< $json
 	grep -q "e" <<< $btc && btc=$(echo $btc|sed 's/e/*10^/'|bc -l)
@@ -79,6 +80,12 @@ BTC $(echo "$btc*$qtd" | bc)
 }
 	envia "$msg"
 	}
+	[ -f ${coin^^}.png ] && {
+		convert ${coin^^}.png -resize 250x187 -background white -gravity center -extent 250x187 tmp.png 2>/dev/null
+		imagem=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@tmp.png |\
+	        jq -r '.result.photo[] | .file_id' | tail -1)
+		rm -f tmp.png ${coin^^}.png
+	} 
 }
 
 ajuda(){
