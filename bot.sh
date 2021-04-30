@@ -42,6 +42,7 @@ coin() {
 		&& qtd=$2 \
 		|| qtd=0
 	json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
+	cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
 
 	grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 	read usd change1h change24h btc symbol <<< $json
@@ -51,6 +52,7 @@ coin() {
 	[ "$qtd" == "0" ] && local msg="\`\`\`
 Cotação CoinMarketCap para ${symbol^^}:
 USD $(formata $usd)
+USDT $(formata $cotacao) (Binance)
 BTC $btc
 24h: $change24h
 1h: $change1h
@@ -60,6 +62,7 @@ BTC $btc
 #	jq -r '"\(.sell) \(.high) \(.low)"')
 	read mbtc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/btc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
 #	read maior menor <<< $(echo "${foxbitsell/.*/},Foxbit
 #${mbtc/.*/},MercadoBitCoin" | sort -nrk1 -t, | tr '\n' ' ')
 	IFS=, read reais maiorexchange <<< ${mbtc/.*/},MercadoBitCoin
@@ -67,6 +70,7 @@ BTC $btc
 ${qtd} ${symbol^^} valem:
 ${symbol^^} $btc (USD $(formata $usd))
 USD $(formata $(echo "$usd*$qtd" | bc ))
+USDT $(formata $cotacao) (Binance)
 BRL $(formata $(echo "$reais*$btc*$qtd" | bc))
 BTC $(echo "$btc*$qtd" | bc)
 24h: $change24h
@@ -133,12 +137,7 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 "
 	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
 	msg+="
-*$maiorexchange/BTCUSD:* $rate
-"
-	msg+="
-*Litecoin:* R\$ $ltc
-(*>* $ltchigh / *<* $ltclow) Var: $(echo "scale=4; ($ltchigh/$ltclow-1)*100"|bc|\
-grep -Eo "[0-9]*\.[0-9]{2}")%
+*${maiorexchange:-MercadoBitCoin}/BTCUSD:* $rate
 "
 	(( ${#msg} > 2 )) && { 
 		envia "$msg"
@@ -224,17 +223,20 @@ binance(){
 	totaldolares=0
 	while read coin qtd; do
 		cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
+		cotacaobtc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}BTC" | jq '.price' -r); 
 		grep -qE "([0-9]+)?\.[0-9]+" <<< $cotacao || { envia "${coin^^} nao encontrada na Binance"; continue; }
 		value=$(echo "scale=2; $cotacao*$qtd"| bc);
 		brl=$(echo "scale=2; $value*$usdt"|bc);
+		btcbrl=$(echo "$brl/$btc"|bc -l)
 		totaldolares=$(echo "scale=2; $totaldolares+$value" | bc)
 		totalreais=$(echo "scale=2; $totalreais+$brl" | bc)
 		local msg+="\`\`\`
 =========================
 ${qtd} ${coin^^} valem:
-${coin^^} $btc (USDT $(formata $cotacao))
+${coin^^} $cotacaobtc (USDT $(formata $cotacao))
 USDT $(formata $value)
 BRL $(formata $brl)
+BTC $btcbrl
 \`\`\`
 "	
 		lista+="$brl,${coin^^}
@@ -285,8 +287,16 @@ consulta(){
 #	jq -r '"\(.sell) \(.high) \(.low)"')
 	read mbtc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/btc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
+	echo "mbtc: $mbtc btchigh: $btchigh btclow: $btclow"
 	read maior menor <<< $(echo "${mbtc/.*/},MercadoBitCoin ${btc/.*/},MercadoBitCoin")
 	IFS=, read reais maiorexchange <<< $maior
+	echo "reais: $reais maiorexchange: $maior"
+	(( ${#reais} < 2 )) && {
+		echo reais vazio buscando na binance
+		reais=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCBRL" | jq '.price')
+		echo reais: $reais
+	}
+
 	msg=
 	totalreais=0
 	totaldolares=0
@@ -308,7 +318,6 @@ consulta(){
 			totalreais=$(echo "scale=2; $totalreais+$reaist" | bc);
 			totaldolares=$(echo "scale=2; $totaldolares+$dolares" | bc);
 			totalbtc=$(echo "$totalbtc+$btc*$qtd"|bc)
-#			echo "$reaist $dolares $totalbtc ======================================================================"
 			local msg+="\`\`\`
 =========================
 ${qtd} ${symbol^^} valem:
@@ -468,7 +477,9 @@ commandlistener &
 
 while : 
 do
+	echo "bot inicializado"
 	dolar=$(curl -s "https://free.currencyconverterapi.com/api/v5/convert?q=USD_BRL&compact=y&apiKey=$CURRENCYAPI"| jq '.USD_BRL.val')
+	echo "valor do dolar: $dolar"
 	let ct+=1
 	(( ct % 2 == 0 )) && { mensagem; sed -i "s/last=.*/last=oe/g" variaveis.sh ; }
 	sleep ${INTERVALO}m
@@ -478,11 +489,13 @@ do
 	tmp=$(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price")
 	xapo=$(printf "%0.2f " ${tmp})
 	tmp=$(wget -qO- $mbtc/btc/ticker |jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"')
+	(( ${#tmp} < 2 )) && {
+		echo reais vazio buscando na binance
+		tmp=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCBRL" | jq '.price')
+		echo reais: $tmp
+	}
+
 	read btc btchigh btclow <<< $(printf "%0.2f " ${tmp:-$btc $btchigh $btclow})
-	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ltc/ticker |\
-	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-#	tmp=$(curl -s "https://api.blinktrade.com/api/v1/BRL/ticker?crypto_currency=BTC" | jq -r '"\(.sell) \(.high) \(.low)"')
-#	read foxbitsell foxbithigh foxbitlow <<< ${tmp:-$foxbitsell $foxbithigh $foxbitlow}
 	read maior menor <<< $(echo "${btc/.*/},MercadoBitCoin ${btc/.*/},MercadoBitCoin")
 	IFS=, read maiorvlr maiorexchange <<< $maior
 	IFS=, read menorvlr menorexchange <<< $menor
