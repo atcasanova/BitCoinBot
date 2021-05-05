@@ -229,8 +229,13 @@ binance(){
 	totalreais=0
 	totaldolares=0
 	while read coin qtd; do
-		cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
-		cotacaobtc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}BTC" | jq '.price' -r); 
+		[ ${coin^^} == "USDT" ] && {
+			cotacao=1.0 
+			cotacaobtc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT" | jq '.price' -r); 
+		} || {
+			cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
+			cotacaobtc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}BTC" | jq '.price' -r); 
+		}
 		grep -qE "([0-9]+)?\.[0-9]+" <<< $cotacao || { envia "${coin^^} nao encontrada na Binance"; continue; }
 		value=$(echo "scale=2; $cotacao*$qtd"| bc);
 		brl=$(echo "scale=2; $value*$usdt"|bc);
@@ -308,16 +313,17 @@ consulta(){
 	totalreais=0
 	totaldolares=0
 	totalbtc=0
+	btcprice=$(curl -sH "$COINMARKET" -H "Accept: application/json" \
+		https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC \
+		| jq -r ".data.BTC.quote.USD.price")
 	while read coin qtd; do
 		json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" \
 			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin \
 			| jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") \
-				$(curl -sH "$COINMARKET" \
-				-H "Accept: application/json" \
-				"https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" \
-				| jq -r ".data.$coin.quote.BTC.price") $coin")"
+			$btcprice $coin")"
 		grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 			read usd change1h change24h btc symbol <<< $json
+			btc=$(echo "$usd/$btc"|bc -l)
 			grep -q "e" <<< "$btc" && btc=$(echo "$btc"|sed 's/e/*10^/'|bc -l)
 			grep -q "e" <<< "$usd" && usd=$(echo "$usd"|sed 's/e/*10^/'|bc -l)
 			reaist=$(echo "$reais*$btc*$qtd" | bc)
@@ -339,7 +345,7 @@ BTC $(echo "$btc*$qtd" | bc)
 			lista+="$reaist,${symbol^^}
 "
 		}
-		sleep 2
+		sleep 0.8
 	done < $dono.coins
 	envia "$msg"
 	stack="Totais para @${dono}:
