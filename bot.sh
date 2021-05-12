@@ -1,7 +1,6 @@
 #!/bin/bash
 source variaveis.sh
->credits
-for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits
+[ ! -s credits ] && { echo vou zerar; for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits; }
 
 ct=0
 curl -s $apiurl/getMe 2>&1 >/dev/null
@@ -33,19 +32,48 @@ isValidCommand(){
 	grep -Eoq "$COMANDOS" <<< "$1"
 }
 
+checkCredits(){
+	[ "$1" == "atc1235" ] && {
+		envia "\`\`\`
+$(cat credits)
+\`\`\`"
+	} || {
+		envia "Seus Créditos:
+\`$(grep "$1 " credits)"\`
+	}
+}	
+
+getPrice(){
+	local pair=$1
+	curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${pair^^}" | jq '.price' -r
+}
+
+
+resetCredits(){
+	[ "$1" == "atc1235" ] || { envia "sonha, @$1!"; checkCredits $1; return 1; }
+	source variaveis.sh
+	for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits
+	
+	envia "\`\`\`
+$(cat credits)
+\`\`\`"
+}
+
 formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" ${1/./,}
 }
 
 
 coin() {
+	creditos=$(grep "^$dono " credits | cut -f2 -d " ")
+	(( $creditos < 1 )) && { envia "Vc tá consultando demais, @$dono seu arrombado. Utilize o /binance"; return; }
 	coin=${1^^}
 	(( $# == 2 )) \
 		&& qtd=$2 \
 		|| qtd=0
 	json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
-	local usdt=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL" |jq -r '.price')
-	cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
+	local usdt=$(getPrice USDTBRL)
+	cotacao=$(getPrice ${coin^^}USDT); 
 	local img=$(curl -s https://coinmarketcap.com | grep -Po "font-size=\"1\">${coin^^}.*(?=(alt=\"[0-9]+-price-graph))"| sed 's/price-graph/\n/g'| head -1| grep -Eo "https://.*png")
 	(( ${#img} > 5 )) && wget -q "$img" -O ${coin^^}.png
 	grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
@@ -89,6 +117,8 @@ envia "$msg"
 	        jq -r '.result.photo[] | .file_id' | tail -1)
 		rm -f tmp.png ${coin^^}.png
 	} 
+	let creditos--
+	sed -i "s/$dono .*/$dono $creditos/g" credits
 }
 
 ajuda(){
@@ -226,18 +256,18 @@ binance(){
 	local dono=$1
 	echo "@$dono" > .binancelock
 	local lista=
-	local usdt=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL" |jq -r '.price')
-	local btc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCBRL" |jq  -r '.price')
+	local usdt=$(getPrice USDTBRL)
+	local btc=$(getPrice BTCBRL)
 	envia "Consultando valores de @$dono na binance baseado em USDT (1 USDT = $usdt BRL)"
 	totalreais=0
 	totaldolares=0
 	while read coin qtd; do
 		[ ${coin^^} == "USDT" ] && {
 			cotacao=1.0 
-			cotacaobtc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT" | jq '.price' -r); 
+			cotacaobtc=$(getPrice BTCUSDT); 
 		} || {
-			cotacao=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}USDT" | jq '.price' -r); 
-			cotacaobtc=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${coin^^}BTC" | jq '.price' -r); 
+			cotacao=$(getPrice ${coin^^}USDT); 
+			cotacaobtc=$(getPrice ${coin^^}BTC); 
 		}
 		grep -qE "([0-9]+)?\.[0-9]+" <<< $cotacao || { envia "${coin^^} nao encontrada na Binance"; continue; }
 		value=$(echo "scale=2; $cotacao*$qtd"| bc);
@@ -292,10 +322,13 @@ BTC $totalbtc
 }
 
 consulta(){
+	graph=1
 	lista=
 	dono=$1
 	creditos=$(grep "^$dono " credits | cut -f2 -d " ")
-	(( $creditos == 0 )) && { envia "Vc tá consultando demais, @$dono seu arrombado. Utilize o /binance"; return; }
+	linhas=$(wc -l < $dono.coins)
+	(( $creditos < $linhas )) && { envia "Vc precisa de $linhas créditos, mas tem apenas $creditos. Use o /binance."; return; }
+	(( $creditos < 1 )) && { envia "Vc tá consultando demais, @$dono seu arrombado. Utilize o /binance"; return; }
 	echo $dono tem $creditos creditos
 #	[[ "$dono" == "eliashamu" ]] && { envia "Suas moedas desapareceram. Chame o FBI"; return 0; }
 	envia "Consultando moedas de @$dono"
@@ -320,6 +353,7 @@ consulta(){
 		https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC \
 		| jq -r ".data.BTC.quote.USD.price")
 	while read coin qtd; do
+		(( $creditos < 1 )) && { envia "Seus Créditos acabaram. Se fudeu"; graph=0; break; }
 		echo buscando $moeda
 		json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" \
 			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin \
@@ -349,6 +383,7 @@ BTC $(echo "$btc*$qtd" | bc)
 			lista+="$reaist,${symbol^^}
 "
 		}
+		let creditos--
 		sleep 0.8
 	done < $dono.coins
 	envia "$msg"
@@ -358,6 +393,8 @@ USD $(formata $totaldolares)
 BRL $(formata $totalreais)
 BTC ${totalbtc}\`\`\`"
 	envia "$stack"
+	(( $graph == 1 )) && {
+	echo $graph valor de graph
 	echo "$(date +%Y%m%d%H%M),$totalreais" >> $dono.history
 	lista=$(echo "${lista::-1}"| sort -nr)
 	argvalor= 
@@ -375,14 +412,13 @@ BTC ${totalbtc}\`\`\`"
 	argmoeda=${argmoeda::-1}
 	arglabel=${arglabel::-1}
 	cores=$(cat $dono.coins | wc -l)
-	
 	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
 	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
         jq -r '.result.photo[] | .file_id' | tail -1)
-	let creditos--
+	mv graph.png history/$dono.$(date "+%Y%m%d-%Hh%M").png
+	}
 	sed -i "s/$dono .*/$dono $creditos/g" credits
 	echo $dono tem $creditos creditos
-	mv graph.png history/$dono.$(date "+%Y%m%d-%Hh%M").png
 }
 
 evolucao(){
@@ -456,7 +492,8 @@ commandlistener(){
 								atualizavar PORCENTAGEM ${command/* /};
 								atualizavar last "$command";
 							};;
-							/coin*) [ "${command}" != "$last" ] && { 
+							/coin*) [ "${command}" != "$last" ] && {
+								dono=$username
 								coin ${command/\/coin /};
 								atualizavar last "$command"; };;
 							/cotacoes) mensagem; 
@@ -482,6 +519,14 @@ commandlistener(){
 								echo $command;
 								atualizavar last "$command";;
 							/evolucao) evolucao $username;
+								command="$command $username";
+								echo $command;
+								atualizavar last "$command";;
+							/creditos) checkCredits $username;
+								command="$command $username";
+								echo $command;
+								atualizavar last "$command";;
+							/reset) resetCredits $username;
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
@@ -512,7 +557,7 @@ do
 	tmp=$(wget -qO- $mbtc/btc/ticker |jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"')
 	(( ${#tmp} < 2 )) && {
 		echo reais vazio buscando na binance
-		tmp=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCBRL" | jq '.price')
+		tmp=$(getPrice BTCBRL)
 		echo reais: $tmp
 	}
 
