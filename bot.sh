@@ -32,6 +32,16 @@ isValidCommand(){
 	grep -Eoq "$COMANDOS" <<< "$1"
 }
 
+getLastDollar(){
+	local offset=1;
+	local dolar=a;
+	while grep -vq "[0-9]" <<< $dolar; do
+		dolar=$(curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "-$offset days" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao" | jq '.value[].cotacaoCompra');
+		let offset++
+	done;
+	echo $dolar;
+}
+
 checkCredits(){
 	[ "$1" == "atc1235" ] && {
 		envia "\`\`\`
@@ -49,6 +59,7 @@ getPrice(){
 }
 
 
+
 resetCredits(){
 	[ "$1" == "atc1235" ] || { envia "sonha, @$1!"; checkCredits $1; return 1; }
 	source variaveis.sh
@@ -63,6 +74,15 @@ formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" ${1/./,}
 }
 
+checkRecord(){
+			dono=$1
+			teste=$2
+			IFS=, read diamesano valorr <<< "$(sort -n -k2 -t, $dono.history  | tail -1)"
+			echo "$teste-$valorr" | bc | grep -q "^-" || {
+				teste=$(formata $teste)
+				envia "Boa, @$dono! Bateu seu recorde historico com R\$ $teste 🎉👏🥳"
+			}
+}
 
 coin() {
 	creditos=$(grep "^$dono " credits | cut -f2 -d " ")
@@ -188,9 +208,10 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 		maior=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | tail -1)
 		menor=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | head -1)
 		sed -i "s/set yrange.*/set yrange [ $((${menor/.*/}*95/100)):$((${maior/.*/}*105/100))]/g" geraimagem.pb
-		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > out.png
-		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
+		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > btc.png
+		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@btc.png |\
 		jq -r '.result.photo[] | .file_id' | tail -1)
+		rm btc.png
 	}
 }
 
@@ -224,8 +245,6 @@ adiciona(){
 	local quantidade=$2
 	touch $dono.coins
 	[[ $quantidade =~ [^[:digit:]\.-] ]] || {
-	json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin" | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"")")"
-		grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 			grep -qi "^$coin " $dono.coins && {
 				read moeda valor <<< $(grep -i "$coin " $dono.coins);
 				quantidade=$(echo "$valor+$quantidade"| bc)
@@ -235,8 +254,6 @@ adiciona(){
 				echo "${coin} $quantidade" >> $dono.coins
 				envia "$quantidade $coin adicionada para @$dono"
 			}
-			coin $coin $quantidade
-		}
 	}
 }
 
@@ -253,7 +270,8 @@ remove(){
 
 binance(){
 	[ -f .binancelock ] && { envia "Usuario $(cat .binancelock) já está consultando. Espere sua vez, fominha"; return 1; }
-	local dono=$1
+	(( $# == 1 )) && { local flag=0; local dono=$1; }
+	(( $# == 2 )) && { local flag=1; local dono=$2; }
 	echo "@$dono" > .binancelock
 	local lista=
 	local usdt=$(getPrice USDTBRL)
@@ -297,6 +315,7 @@ BTC $totalbtc
 \`\`\`
 "
 	envia "$stack"
+	checkRecord $dono $totalreais
 	lista=$(echo "${lista::-1}"| sort -nr)
 	argvalor= 
 	argmoeda=
@@ -318,6 +337,7 @@ BTC $totalbtc
 	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
         jq -r '.result.photo[] | .file_id' | tail -1)
 	rm .binancelock -f
+	(( ${flag:-0} == 1 )) && echo "$(date +%Y%m%d%H%M),$totalreais" >> $dono.history
 #	mv graph.png history/$dono.$(date "+%Y%m%d-%Hh%M").png
 }
 
@@ -338,7 +358,7 @@ consulta(){
 	read maior menor <<< $(echo "${mbtc/.*/},MercadoBitCoin ${btc/.*/},MercadoBitCoin")
 	IFS=, read reais maiorexchange <<< $maior
 	echo "reais: $reais maiorexchange: $maior"
-	dol=$(curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "yesterday" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao"|jq '.value[].cotacaoCompra')
+	dol=$(getLastDollar)
 	(( ${#reais} < 2 )) && {
 		echo reais vazio buscando na binance
 		reais=$(curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=BTCBRL" | jq '.price')
@@ -393,6 +413,7 @@ USD $(formata $totaldolares)
 BRL $(formata $totalreais)
 BTC ${totalbtc}\`\`\`"
 	envia "$stack"
+	checkRecord $dono $totalreais
 	(( $graph == 1 )) && {
 	echo $graph valor de graph
 	echo "$(date +%Y%m%d%H%M),$totalreais" >> $dono.history
@@ -435,10 +456,17 @@ evolucao(){
 			done < $dono.history
 			arg=${arg::-1}
 			arg=$(echo "$arg"|tr -s ',')
-			wget -q --post-data="cht=lc&chd=t:$arg&chs=600x500&chtt=Evolução%20do%20Stack%20de%20$dono&chxt=y&chds=a&chg=10,10" "https://chart.googleapis.com/chart" -Oout.png
+			while [ ! -s out.png ]; do
+				wget -q --post-data="chdl=Total&cht=lc&chd=t:$arg&chs=600x500&chtt=Evolução%20do%20Stack%20de%20$dono&chxt=y&chds=a&chg=10,10" \
+				"https://chart.googleapis.com/chart" -Oout.png
+			done
 			grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
 			jq -r '.result.photo[] | .file_id' | tail -1)
 			rm out.png
+			IFS=, read diamesano valorr <<< "$(sort -n -k2 -t, $dono.history  | tail -1)"
+			local data="${diamesano:6:2}/${diamesano:4:2}/${diamesano:0:4}, ${diamesano:8:2}:${diamesano:10:2}"
+			local valor=$(formata $valorr)
+			envia "Maior valor: $valor em $data"
 		}
 	}
 }
@@ -518,6 +546,10 @@ commandlistener(){
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
+							/binancegrava) binance flag $username;
+								command="$command $username";
+								echo $command;
+								atualizavar last "$command";;
 							/evolucao) evolucao $username;
 								command="$command $username";
 								echo $command;
@@ -544,7 +576,7 @@ commandlistener &
 while : 
 do
 	echo "bot inicializado"
-	dolar=$(curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "yesterday" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao"|jq '.value[].cotacaoCompra')
+	dolar=$(getLastDollar)
 	echo "valor do dolar: $dolar"
 	let ct+=1
 	(( ct % 2 == 0 )) && { mensagem; sed -i "s/last=.*/last=oe/g" variaveis.sh ; }
