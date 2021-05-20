@@ -71,14 +71,14 @@ $(cat credits)
 }
 
 formata(){
-	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" ${1/./,}
+	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" -- ${1/./,}
 }
 
 checkRecord(){
 			dono=$1
 			teste=$2
 			IFS=, read diamesano valorr <<< "$(sort -n -k2 -t, $dono.history  | tail -1)"
-			echo "$teste-$valorr" | bc | grep -q "^-" || {
+			bc <<< "$teste-$valorr" | grep -q "^-" || {
 				teste=$(formata $teste)
 				envia "Boa, @$dono! Bateu seu recorde historico com R\$ $teste 🎉👏🥳"
 			}
@@ -98,8 +98,8 @@ coin() {
 	(( ${#img} > 5 )) && wget -q "$img" -O ${coin^^}.png
 	grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 	read usd change1h change24h btc symbol <<< $json
-	grep -q "e" <<< $btc && btc=$(echo $btc|sed 's/e/*10^/'|bc -l)
-	grep -q "e" <<< $usd && usd=$(echo $usd|sed 's/e/*10^/'|bc -l)
+	grep -q "e" <<< $btc && btc=$(sed 's/e/*10^/' <<< "$btc" | bc -l)
+	grep -q "e" <<< $usd && usd=$(sed 's/e/*10^/' <<< "$usd" | bc -l)
 	[[ $qtd =~ [^[:digit:]\.] ]] && qtd=0
 	[ "$qtd" == "0" ] && { 
 		local msg="\`\`\`
@@ -119,12 +119,12 @@ msg+="BTC $btc
 	local msg="\`\`\`
 ${qtd} ${symbol^^} valem:
 ${symbol^^} $btc (USD $(formata $usd))
-USD $(formata $(echo "$usd*$qtd" | bc ))
+USD $(formata $(bc <<< "$usd*$qtd" ))
 "
 grep -q null <<< $cotacao || msg+="USDT $(formata $cotacao) (Binance)
 "
-msg+="BRL $(formata $(echo "$qtd*$usdt*$usd" | bc))
-BTC $(echo "$btc*$qtd" | bc)
+msg+="BRL $(formata $(bc <<< "$qtd*$usdt*$usd"))
+BTC $(bc <<< "$btc*$qtd")
 24h: $change24h
 1h: $change1h
 \`\`\`"
@@ -172,30 +172,22 @@ mensagem (){
 	source variaveis.sh
 	dolarbb=$(curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "yesterday" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao"|jq '.value[].cotacaoCompra')
 	xapo=$(printf "%0.2f" $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price"))
-	dolar2000=$(echo "scale=4; ${dolarbb:-0}*1.0844" | bc)
-	dolar3000=$(echo "scale=4; ${dolarbb:-0}*1.0664" | bc)
-	dolar4000=$(echo "scale=4; ${dolarbb:-0}*1.0574" | bc)
 	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/btc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ltc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
-	read maior menor <<< $(echo "${btc/.*/},MercadoBitCoin ${btc/.*/},MercadoBitCoin")
+	read maior menor <<< "${btc/.*/},MercadoBitCoin ${btc/.*/},MercadoBitCoin"
 	IFS=, read maiorvlr maiorexchange <<< $maior
 	IFS=, read menorvlr menorexchange <<< $menor
-	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
+	diff=$(bc <<< "scale=3; (($maiorvlr/$menorvlr)-1)*100" | grep -Eo "[0-9]{1,}\.[0-9]")
 	msg="*Bitcoin: *
 *MercadoBTC:* R\$ $btc
-(*>* $btchigh / *<* $btclow) Var: $(echo "scale=5; ($btchigh/$btclow-1)*100"|bc|\
+(*>* $btchigh / *<* $btclow) Var: $(bc <<< "scale=5; ($btchigh/$btclow-1)*100"|\
 grep -Eo "[0-9]*\.[0-9]{2}")%
 
 *BTCUSD:* USD $xapo
-
-*Custo Dolar BB -> Xapo*: 
-*USD 2000*: $dolar2000
-*USD 3000*: $dolar3000
-*USD 4000*: $dolar4000
 "
-	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
+	rate=$(bc <<< "scale=2; $maiorvlr/$xapo")
 	msg+="
 *${maiorexchange:-MercadoBitCoin}/BTCUSD:* $rate
 "
@@ -205,8 +197,8 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 	[ -s $(date "+%Y%m%d").dat ] && {
 		[ -s $(date "+%Y%m%d" --date="1 day ago").dat ] \
 		&& cat $(date "+%Y%m%d" --date="1 day ago").dat >> /historico.dat
-		maior=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | tail -1)
-		menor=$(cat $(date "+%Y%m%d").dat | grep -Eo "[0-9]{3,}"| sort -n | head -1)
+		maior=$(grep -Eo "[0-9]{3,}" $(date "+%Y%m%d").dat | sort -n | tail -1)
+		menor=$(grep -Eo "[0-9]{3,}" $(date "+%Y%m%d").dat | sort -n | head -1)
 		sed -i "s/set yrange.*/set yrange [ $((${menor/.*/}*95/100)):$((${maior/.*/}*105/100))]/g" geraimagem.pb
 		gnuplot -c geraimagem.pb $(date "+%Y%m%d").dat > btc.png
 		idphoto=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@btc.png |\
@@ -231,7 +223,7 @@ alerta(){
 "
 			(( ${exchangemax/.*/} > 0 )) && {
 				msg+="(*Max* R\$ $exchangemax / *Min* R\$ $exchangemin)
-Δ% na $exchange: $(echo "scale=4; ($exchangemax/$exchangemin-1)*100"|bc|grep -Eo "[0-9]*\.[0-9]{2}")% 
+Δ% na $exchange: $(bc <<< "scale=4; ($exchangemax/$exchangemin-1)*100" | grep -Eo "[0-9]*\.[0-9]{2}")% 
 "
 			}
 		}
@@ -245,15 +237,22 @@ adiciona(){
 	local quantidade=$2
 	touch $dono.coins
 	[[ $quantidade =~ [^[:digit:]\.-] ]] || {
-			grep -qi "^$coin " $dono.coins && {
-				read moeda valor <<< $(grep -i "$coin " $dono.coins);
-				quantidade=$(echo "$valor+$quantidade"| bc)
-				sed -i "s/$coin .*/$coin $quantidade/g" $dono.coins
-				envia "Quantidade de $coin atualizada para $quantidade para @$dono"
-			} || {
-				echo "${coin} $quantidade" >> $dono.coins
-				envia "$quantidade $coin adicionada para @$dono"
-			}
+		grep -qi "^$coin " $dono.coins && {
+			read moeda valor <<< $(grep -i "$coin " $dono.coins);
+			quantidade=$(bc <<< "$valor+$quantidade")
+			sed -i "s/$coin .*/$coin $quantidade/g" $dono.coins
+			envia "Quantidade de $coin atualizada para $quantidade para @$dono"
+		} || {
+			echo "${coin} $quantidade" >> $dono.coins
+			envia "$quantidade $coin adicionada para @$dono"
+		}
+	  local usdt=$(getPrice USDTBRL)
+	  local cotacao=$(getPrice ${coin^^}USDT);
+		local totalusd=$(bc <<< "scale=2; $cotacao*$2")
+		local totalbrl=$(bc <<< "scale=2; $totalusd*$usdt")
+		msg="$coin USD $(formata $cotacao) (+$2)
+Total adicionado: R\$ $(formata $totalbrl) (USD $(formata $totalusd))"
+		envia "$msg"
 	}
 }
 
@@ -288,11 +287,11 @@ binance(){
 			cotacaobtc=$(getPrice ${coin^^}BTC); 
 		}
 		grep -qE "([0-9]+)?\.[0-9]+" <<< $cotacao || { envia "${coin^^} nao encontrada na Binance"; continue; }
-		value=$(echo "scale=2; $cotacao*$qtd"| bc);
-		brl=$(echo "scale=2; $value*$usdt"|bc);
-		btcbrl=$(echo "$brl/$btc"|bc -l)
-		totaldolares=$(echo "scale=2; $totaldolares+$value" | bc)
-		totalreais=$(echo "scale=2; $totalreais+$brl" | bc)
+		value=$(bc <<< "scale=2; $cotacao*$qtd");
+		brl=$(bc <<< "scale=2; $value*$usdt");
+		btcbrl=$(bc -l <<< "$brl/$btc")
+		totaldolares=$(bc <<< "scale=2; $totaldolares+$value")
+		totalreais=$(bc <<< "scale=2; $totalreais+$brl")
 		local msg+="\`\`\`
 =========================
 ${qtd} ${coin^^} valem:
@@ -306,7 +305,7 @@ BTC $btcbrl
 "
 	done < $dono.coins
 	envia "$msg"
-	totalbtc=$(echo "$totalreais/$btc"|bc -l)	
+	totalbtc=$(bc -l <<< "$totalreais/$btc")
 	stack="Totais para @${dono}:
 \`\`\`
 USD $(formata $totaldolares)
@@ -322,7 +321,7 @@ BTC $totalbtc
 	arglabel=
 	while IFS=, read valor moeda; do
 		echo buscando $moeda
-		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
+		percent=$(bc <<< "scale=2; (100*$valor)/$totalreais")
 		argvalor+="$percent,"
 		valor=$(formata $valor)
 		argmoeda+="${moeda^^} R\$ ${valor::-3}|"
@@ -331,9 +330,9 @@ BTC $totalbtc
 	argvalor=${argvalor::-1}
 	argmoeda=${argmoeda::-1}
 	arglabel=${arglabel::-1}
-	cores=$(cat $dono.coins | wc -l)
+	cores=$(wc -l < $dono.coins)
 	
-	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
+	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(tr ' ' '|' <<< ${COLORS[@]:0:$cores})&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
 	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
         jq -r '.result.photo[] | .file_id' | tail -1)
 	rm .binancelock -f
@@ -381,21 +380,21 @@ consulta(){
 			$btcprice $coin")"
 		grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 			read usd change1h change24h btc symbol <<< $json
-			btc=$(echo "$usd/$btc"|bc -l)
-			grep -q "e" <<< "$btc" && btc=$(echo "$btc"|sed 's/e/*10^/'|bc -l)
-			grep -q "e" <<< "$usd" && usd=$(echo "$usd"|sed 's/e/*10^/'|bc -l)
-			dolares=$(echo "$usd*$qtd" | bc)
-			reaist=$(echo "$dolares*$dol" | bc)
-			totalreais=$(echo "scale=2; $totalreais+$reaist" | bc);
-			totaldolares=$(echo "scale=2; $totaldolares+$dolares" | bc);
-			totalbtc=$(echo "${totalbtc}+${btc:-0.0000000001}*$qtd"|bc)
+			btc=$(bc -l <<< "$usd/$btc")
+			grep -q "e" <<< "$btc" && btc=$(sed 's/e/*10^/' <<< "$btc" | bc -l)
+			grep -q "e" <<< "$usd" && usd=$(sed 's/e/*10^/' <<< "$usd" | bc -l)
+			dolares=$(bc <<< "$usd*$qtd")
+			reaist=$(bc <<< "$dolares*$dol")
+			totalreais=$(bc <<< "scale=2; $totalreais+$reaist");
+			totaldolares=$(bc <<< "scale=2; $totaldolares+$dolares");
+			totalbtc=$(bc <<< "${totalbtc}+${btc:-0.0000000001}*$qtd")
 			local msg+="\`\`\`
 =========================
 ${qtd} ${symbol^^} valem:
 ${symbol^^} $btc (USD $(formata $usd))
 USD $(formata $dolares)
 BRL $(formata $reaist)
-BTC $(echo "$btc*$qtd" | bc)
+BTC $(bc <<< "$btc*$qtd")
 24h: $change24h
 1h: $change1h
 \`\`\`
@@ -417,13 +416,13 @@ BTC ${totalbtc}\`\`\`"
 	(( $graph == 1 )) && {
 	echo $graph valor de graph
 	echo "$(date +%Y%m%d%H%M),$totalreais" >> $dono.history
-	lista=$(echo "${lista::-1}"| sort -nr)
+	lista=$(sort -nr <<< "${lista::-1}")
 	argvalor= 
 	argmoeda=
 	arglabel=
 	while IFS=, read valor moeda; do
 		echo buscando $moeda
-		percent=$(echo "scale=2; (100*$valor)/$totalreais"|bc)
+		percent=$(bc <<< "scale=2; (100*$valor)/$totalreais")
 		argvalor+="$percent,"
 		valor=$(formata $valor)
 		argmoeda+="${moeda^^} R\$ ${valor::-3}|"
@@ -432,8 +431,8 @@ BTC ${totalbtc}\`\`\`"
 	argvalor=${argvalor::-1}
 	argmoeda=${argmoeda::-1}
 	arglabel=${arglabel::-1}
-	cores=$(cat $dono.coins | wc -l)
-	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(echo ${COLORS[@]:0:$cores} |tr ' ' '|')&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
+	cores=$(wc -l < $dono.coins)
+	wget -q "https://chart.googleapis.com/chart?cht=p3&chd=t:$argvalor&chs=600x400&chdl=$argmoeda&chco=$(tr ' ' '|' <<< ${COLORS[@]:0:$cores})&chds=a&chtt=$dono BRL $(formata $totalreais)&chl=$arglabel&chdlp=b" -Ograph.png
 	grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@graph.png |\
         jq -r '.result.photo[] | .file_id' | tail -1)
 	mv graph.png history/$dono.$(date "+%Y%m%d-%Hh%M").png
@@ -447,7 +446,7 @@ evolucao(){
 	[ ! -s $dono.history ] && {
 		envia "Nao ha dados para $dono. Use /consulta antes";
 	} || {
-		(( $(cat $dono.history | wc -l ) < 2 )) && {
+		(( $(wc -l < $dono.history) < 2 )) && {
 			envia "Poucos registros para gerar o grafico para @$dono. Mínimo: 2";
 		} || {
 			arg=
@@ -455,18 +454,18 @@ evolucao(){
 				arg+=${valor//.*/},
 			done < $dono.history
 			arg=${arg::-1}
-			arg=$(echo "$arg"|tr -s ',')
+			arg=$(tr -s ',' <<< "$arg")
+			local last=$(formata $(tail -1 $dono.history| cut -f2 -d,))
+			IFS=, read diamesano valorr <<< "$(sort -n -k2 -t, $dono.history  | tail -1)"
+			local data="${diamesano:6:2}/${diamesano:4:2}/${diamesano:0:4}, ${diamesano:8:2}:${diamesano:10:2}"
+			local valor=$(formata $valorr)
 			while [ ! -s out.png ]; do
-				wget -q --post-data="chdl=Total&cht=lc&chd=t:$arg&chs=600x500&chtt=Evolução%20do%20Stack%20de%20$dono&chxt=y&chds=a&chg=10,10" \
+				wget -q --post-data="chdl=Total&cht=lc&chd=t:$arg&chs=600x500&chtt=Stack+de+$dono:+R%24+$last|Recorde:+R%24+$valor+em+$data&chxt=y&chds=a&chg=10,10" \
 				"https://chart.googleapis.com/chart" -Oout.png
 			done
 			grafico=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@out.png |\
 			jq -r '.result.photo[] | .file_id' | tail -1)
 			rm out.png
-			IFS=, read diamesano valorr <<< "$(sort -n -k2 -t, $dono.history  | tail -1)"
-			local data="${diamesano:6:2}/${diamesano:4:2}/${diamesano:0:4}, ${diamesano:8:2}:${diamesano:10:2}"
-			local valor=$(formata $valorr)
-			envia "Maior valor: $valor em $data"
 		}
 	}
 }
@@ -481,7 +480,7 @@ commandlistener(){
 		for comando in $(curl -s  -X POST --data "offset=$(($offset+1))&limit=1" "$apiurl/getUpdates" |\
 		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
 		sed 's| |\||g' | sort | uniq); do
-			read offset username command <<< $(echo $comando | sed 's/|/ /g')
+			read offset username command <<< $(sed 's/|/ /g' <<< "$comando")
 			shopt -s extglob
 			isAdmin "$username" && {
 				command=${command%%@*}
@@ -597,21 +596,17 @@ do
 	read maior menor <<< $(echo "${btc/.*/},MercadoBitCoin ${btc/.*/},MercadoBitCoin")
 	IFS=, read maiorvlr maiorexchange <<< $maior
 	IFS=, read menorvlr menorexchange <<< $menor
-	diff=$(echo "scale=3; (($maiorvlr/$menorvlr)-1)*100" | bc | grep -Eo "[0-9]{1,}\.[0-9]")
+	diff=$(bc <<< "scale=3; (($maiorvlr/$menorvlr)-1)*100" | grep -Eo "[0-9]{1,}\.[0-9]")
 	
-#	alerta ${BTCMAX} ${BTCMIN} ${btc:-0} ${btchigh:-0} ${btclow:-0} MercadoBitcoini
-#	alerta ${BTCMAX} ${BTCMIN} ${foxbitsell:-0} ${foxbithigh:-0} ${foxbitlow:-0} FoxBit
-#	alerta ${LTCMAX} ${LTCMIN} ${ltc:-0} ${ltchigh:-0} ${ltclow:-0} "MercadoBitcoin(Litecoin)"
-
-	rate=$(echo "scale=2; $maiorvlr/$xapo" |bc)
+	rate=$(bc <<< "scale=2; $maiorvlr/$xapo")
 	rate=${rate:-3}
-	btcusd=$(echo "scale=2; $xapo*$dolar"|bc)
-	(( $(echo "${rate} >= ${PORCENTAGEM}"|bc) == 1 )) && {
+	btcusd=$(bc <<< "scale=2; $xapo*$dolar")
+	(( $(bc <<< "${rate} >= ${PORCENTAGEM}") == 1 )) && {
 		msg+="
 *$maiorexchange/BTCUSD:* $rate ($btc/$xapo)"
 	}
 	diff=${diff:-0}
-	(( $(echo "${diff} >= ${PORCENTAGEM}"|bc) == 1 )) && {
+	(( $(bc <<< "${diff} >= ${PORCENTAGEM}") == 1 )) && {
 		msg+="
 *$maiorexchange ($maiorvlr) ${diff}% mais caro que $menorexchange ($menorvlr)*
 "
