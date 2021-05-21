@@ -24,5 +24,8 @@ COMANDOS="^/cotacoes$|\
 ^/remove [0-9a-zA-Z-]+$|\
 ^/consulta$|\
 ^/evolucao$|\
+^/reset$|\
+^/creditos$|\
+^/binancegrava$|\
 ^/binance$"
 
