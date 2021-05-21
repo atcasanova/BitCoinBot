@@ -43,7 +43,7 @@ getLastDollar(){
 }
 
 checkCredits(){
-	[ "$1" == "atc1235" ] && {
+	[ "$1" == "$MASTER" ] && {
 		envia "\`\`\`
 $(cat credits)
 \`\`\`"
