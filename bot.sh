@@ -12,18 +12,6 @@ envia(){
 	-F chat_id=$CHATID 2>&1 >/dev/null 
 }
 
-parametros(){
-	local mensagem="Parâmetros:
-BTC: > $BTCMAX e < $BTCMIN
-LTC: > $LTCMAX e < $LTCMIN
-CHECAGEM A CADA $INTERVALO minutos
-ALERTA SE DIFERENÇA MAIOR QUE $PORCENTAGEM %
-"
-	envia "$mensagem"
-}
-
-parametros
-
 isAdmin(){
 	grep -q $1 <<< "${ADMINS[@]}"
 }
@@ -36,7 +24,7 @@ getLastDollar(){
 	local offset=1;
 	local dolar=a;
 	while grep -vq "[0-9]" <<< $dolar; do
-		dolar=$(curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "-$offset days" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao" | jq '.value[].cotacaoCompra');
+		dolar=$(timeout 3 curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "-$offset days" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao" | jq '.value[].cotacaoCompra');
 		let offset++
 	done;
 	echo $dolar;
@@ -58,8 +46,6 @@ getPrice(){
 	curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${pair^^}" | jq '.price' -r
 }
 
-
-
 resetCredits(){
 	[ "$1" == "atc1235" ] || { envia "sonha, @$1!"; checkCredits $1; return 1; }
 	source variaveis.sh
@@ -72,6 +58,50 @@ $(cat credits)
 
 formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" -- ${1/./,}
+}
+
+monitorar(){
+	echo "$# $*"
+	[ "$3" == "$MASTER" ] || { envia "Chora"; return; } 
+	local coin=${2^^}
+	[ "${1^^}" == "ON" ] && {
+		grep -q "^$coin " alertas && { envia "$coin ja esta sendo monitorada"; return; }
+		local price=$(getPrice ${coin}USDT)
+		echo "$coin $price" >> alertas
+		envia "Monitorando $coin (USD $price)"
+	}
+	[ "${1^^}" == "OFF" ] && {
+		grep -q "^$coin " alertas && {
+			sed -i "/^$coin /d" alertas
+			envia "$coin removida da monitoração"
+		} || { 
+			envia "$coin não esta sendo monitorada";
+			return; 
+		}
+		
+	}
+}
+
+alerta(){
+	echo "executando funcao de alerta"
+	local msg=
+	[ -s alertas ] || { envia "nenhum alerta configurado"; return; }
+	echo "arquivo de alertas existe"
+	local alertas=$(cut -f1 -d" " alertas)
+	for coin in $alertas; do
+		newPrice=$(getPrice ${coin}USDT)
+		lastPrice=$(grep -Po "(?<=$coin ).*" alertas)
+		variacao=$(bc -l <<< "scale=4; ($newPrice/$lastPrice-1)*100" | sed 's/0*$//g')
+		echo variacao: $variacao
+		grep -qE "^-?\." <<< $variacao && int=0 || int=${variacao%%\.*}
+		signal="🦀"
+		(( ${int} >= $THRESHOLD )) && signal="🚀"
+		(( ${int} <= -$THRESHOLD )) && signal="📉"
+		sed -i "s/$coin .*/$coin $newPrice/g" alertas
+		msg+="$coin $(formata $lastPrice) ➡️ $(formata $newPrice) ($variacao%) $signal
+"
+	done
+	envia "$msg"
 }
 
 checkRecord(){
@@ -169,9 +199,15 @@ export offset
 export command
 
 mensagem (){
+	echo carregando variaveis
 	source variaveis.sh
-	dolarbb=$(curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "yesterday" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao"|jq '.value[].cotacaoCompra')
+	echo consultando dolar
+	dolarbb=$(getLastDollar)
+	echo dolar: $dolarbb
+	echo consultando btc no coinmarketcap
 	xapo=$(printf "%0.2f" $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price"))
+	echo btc: $xapo
+	echo consulta no mbtc
 	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/btc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	read ltc ltchigh ltclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/ltc/ticker |\
@@ -208,27 +244,6 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 }
 
 mensagem
-
-alerta(){
-	valorhigh=$1
-	valormin=$2
-	valoraferido=$3
-	exchangemax=$4
-	exchangemin=$5
-	exchange=$6
-	if (( ${valoraferido/.*/} != 0 )); then
-		(( ${valoraferido/.*/} > ${valorhigh} )) ||\
-		(( ${valoraferido/.*/} < ${valormin} )) && {
-			msg+="*${exchange}:* R\$ $valoraferido
-"
-			(( ${exchangemax/.*/} > 0 )) && {
-				msg+="(*Max* R\$ $exchangemax / *Min* R\$ $exchangemin)
-Δ% na $exchange: $(bc <<< "scale=4; ($exchangemax/$exchangemin-1)*100" | grep -Eo "[0-9]*\.[0-9]{2}")% 
-"
-			}
-		}
-	fi
-}
 
 adiciona(){
 	(( $# != 3 )) && return 1;
@@ -533,6 +548,10 @@ commandlistener(){
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
+							/monitorar*) monitorar ${command/\/monitorar /} $username;
+								command="$command $username";
+								echo $command;
+								atualizavar last "$command";;
 							/remove*) remove ${command/\/remove /} $username;
 								command="$command $username";
 								echo $command;
@@ -579,8 +598,9 @@ do
 	echo "valor do dolar: $dolar"
 	let ct+=1
 	(( ct % 2 == 0 )) && { mensagem; sed -i "s/last=.*/last=oe/g" variaveis.sh ; }
-	sleep ${INTERVALO}m
 	source variaveis.sh
+	alerta
+	sleep ${INTERVALO}m
 	msg=
 	
 	tmp=$(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price")
