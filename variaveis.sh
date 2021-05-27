@@ -17,10 +17,6 @@ mbtc=https://www.mercadobitcoin.net/api
 coinmarketcap=https://api.coinmarketcap.com/v1/ticker
 THRESHOLD="3"
 COMANDOS="^/cotacoes$|\
-^/[lb]tcm[ai][xn] [0-9]+$|\
-^/help$|^/parametros$|\
-^/intervalo [0-9]+(\.[0-9])?$|\
-^/porcentagem [0-9]{1,2}(\.[0-9]{1,2})?$|\
 ^/coin [a-zA-Z0-9.-]+( [0-9]+(\.[0-9]+)?)?$|\
 ^/adiciona [0-9a-zA-Z-]+ -?[0-9]+(\.[0-9]+)?$|\
 ^/remove [0-9a-zA-Z-]+$|\
@@ -28,8 +24,7 @@ COMANDOS="^/cotacoes$|\
 ^/evolucao$|\
 ^/reset$|\
 ^/creditos$|\
-^/monitorar (on|off) [0-9a-zA-Z-]+$|\ 
+^/monitorar (on|off) [0-9a-zA-Z-]+$|\
+^/alertar (off|-?[0-9]+(\.[0-9]+)?) [0-9a-zA-Z-]+$|\
 ^/binancegrava$|\
 ^/binance$"
-
-
