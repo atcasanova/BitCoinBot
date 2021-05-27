@@ -60,9 +60,67 @@ formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" -- ${1/./,}
 }
 
+monitorar2(){
+	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; } 
+	local coin=${2^^}
+	local valor="$1"
+	[ "${valor^^}" = "OFF" ] && {
+		grep -q "^$coin " alertas2 && {
+			sed -i "/^$coin /d" alertas2 
+			envia "$coin removida da monitoração"
+		} || {
+			envia "$coin não esta sendo monitorada"
+		}
+		return;
+	}
+	grep -qE -- "^-[0-9]" <<< "$valor" && positivo=0 || positivo=1
+	read moeda maior menor < <(grep "^${coin:-vraaaaa} " alertas2)
+	[ -z $moeda ] && { 
+		# moeda não monitorada
+		(( $positivo == 0 )) && {
+			echo "$coin 0 ${valor//-/}" >> alertas2
+			envia "Bot avisará se $coin < ${valor//-/}"
+			return;
+		} || {
+			echo "$coin ${valor//-/} 0" >> alertas2
+			envia "Bot avisará se $coin > ${valor//-/}"
+			return;
+		}
+		grep $coin alertas2
+
+	} || { 
+		# se a moeda ja existir
+		(( $positivo == 0 )) && {
+			sed -i "s/^\($coin [^ ]*\) .*/\1 ${valor//-/}/g" alertas2
+			envia "Bot avisará se $coin < ${valor//-/}"
+		} || {
+			sed -i "s/^\($coin [^ ]*\) \(.*\)/$coin $valor \2/g" alertas2
+			envia "Bot avisará se $coin > $valor"
+		}
+		return;
+	}
+}
+
+alerta2(){
+	local msg=
+	[ -s alertas2 ] || return
+	while read moeda maior menor; do
+		price=$(getPrice ${moeda^^}USDT)
+		[ "$maior" != "0" ] && {		
+			(( $(bc -l <<< "$price>$maior") )) && {
+				envia "${moeda^^} está $price (>$maior) 🚀"
+			}
+		}
+		[ "$menor" != "0" ] && {
+			(( $(bc -l <<< "$price<$menor") )) && {
+				envia "${moeda^^} está $price (<$menor) 📉"
+			}
+		}
+	done < alertas2
+}
+
 monitorar(){
-	echo "$# $*"
-	[ "$3" == "$MASTER" ] || { envia "Chora"; return; } 
+	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; } 
 	local coin=${2^^}
 	[ "${1^^}" == "ON" ] && {
 		grep -q "^$coin " alertas && { envia "$coin ja esta sendo monitorada"; return; }
@@ -83,7 +141,6 @@ monitorar(){
 }
 
 alerta(){
-	echo "executando funcao de alerta"
 	local msg=
 	[ -s alertas ] || { envia "nenhum alerta configurado"; return; }
 	echo "arquivo de alertas existe"
@@ -169,26 +226,6 @@ envia "$msg"
 	} 
 	let creditos--
 	sed -i "s/$dono .*/$dono $creditos/g" credits
-}
-
-ajuda(){
-	local mensagem="Comandos aceitos:
-*/ltcmax 170*
-*/ltcmin 110*
-*/btcmax 9500*
-*/btcmin 8000*
-*/intervalo 5*
-*/porcentagem 4.01*
-*/parametros*
-*/cotacoes*
-*/coin moeda*
-*/coin moeda 1.3*
-*/adiciona moeda 30.3*
-*/remove moeda*
-*/consulta*
-*/evolucao*
-"
-	envia "$mensagem"
 }
 
 read offset username command <<< $(curl -s  -X GET "$apiurl/getUpdates"  |\
@@ -504,51 +541,21 @@ commandlistener(){
 					[ "$command" != "$last" ] && {
 						echo $offset - @$username - $command - $last >> comandos.log
 						case $command in 
-							/ltcmax*) (( ${command/* /} != $LTCMAX )) && {
-								envia "${username}, setando *LTCMAX* para ${command/* /}";
-								atualizavar LTCMAX ${command/* /}; 
-								atualizavar last "$command";
-							};;
-							/ltcmin*) (( ${command/* /} != $LTCMIN )) && {
-								envia "${username}, setando *LTCMIN* para ${command/* /}";
-								atualizavar LTCMIN ${command/* /};
-								atualizavar last "$command"; 
-							};;
-							/btcmax*) (( ${command/* /} != $BTCMAX )) && {
-								envia "${username}, setando *BTCMAX* para ${command/* /}";
-								atualizavar BTCMAX ${command/* /};
-								atualizavar last "$command";
-							};;
-							/btcmin*) (( ${command/* /} != $BTCMIN )) && {
-								envia "${username}, setando *BTCMIN* para ${command/* /}";
-								atualizavar BTCMIN ${command/* /};
-								atualizavar last "$command";
-							};;
-							/intervalo*) [ "${command/* /}" != "$INTERVALO" ] && {
-								envia "${username}, setando *intervalo* para ${command/* /} minutos";
-								atualizavar INTERVALO ${command/* /};
-								atualizavar last "$command";
-							};;
-							/porcentagem*) [ "${command/* /}" != "$PORCENTAGEM" ] && {
-								envia "${username}, setando *porcentagem* para ${command/* /}%";
-								atualizavar PORCENTAGEM ${command/* /};
-								atualizavar last "$command";
-							};;
 							/coin*) [ "${command}" != "$last" ] && {
 								dono=$username
 								coin ${command/\/coin /};
 								atualizavar last "$command"; };;
 							/cotacoes) mensagem; 
 								atualizavar last "$command";;
-							/parametros) parametros $username; 
-								atualizavar last "$command";;
-							/help) ajuda $username; 
-								atualizavar last "$command";;
 							/adiciona*) adiciona ${command/\/adiciona /} $username;
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
 							/monitorar*) monitorar ${command/\/monitorar /} $username;
+								command="$command $username";
+								echo $command;
+								atualizavar last "$command";;
+							/alertar*) monitorar2 ${command/\/alertar /} $username;
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
@@ -590,6 +597,12 @@ commandlistener(){
 }
 
 commandlistener &
+
+while :
+do
+	alerta2
+	sleep 5m
+done &
 
 while : 
 do
