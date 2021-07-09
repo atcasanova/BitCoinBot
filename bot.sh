@@ -60,10 +60,15 @@ formata(){
 	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" -- ${1/./,}
 }
 
+
 monitorar2(){
 	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; } 
 	local coin=${2^^}
 	local valor="$1"
+	[ "${valor^^}" == "LIST" ] && {
+		envia "$(cat alertas2)"
+		return
+	}
 	[ "${valor^^}" = "OFF" ] && {
 		grep -q "^$coin " alertas2 && {
 			sed -i "/^$coin /d" alertas2 
@@ -142,20 +147,19 @@ monitorar(){
 
 alerta(){
 	local msg=
-	[ -s alertas ] || { envia "nenhum alerta configurado"; return; }
-	echo "arquivo de alertas existe"
+	[ -s alertas ] || return;
 	local alertas=$(cut -f1 -d" " alertas)
 	for coin in $alertas; do
 		newPrice=$(getPrice ${coin}USDT)
 		lastPrice=$(grep -Po "(?<=$coin ).*" alertas)
+		(( $(bc -l <<< "$newPrice >= $lastPrice") == 1 )) && symbol='🔼' || symbol='🔽'
 		variacao=$(bc -l <<< "scale=4; ($newPrice/$lastPrice-1)*100" | sed 's/0*$//g')
-		echo variacao: $variacao
 		grep -qE "^-?\." <<< $variacao && int=0 || int=${variacao%%\.*}
 		signal="🦀"
-		(( ${int} >= $THRESHOLD )) && signal="🚀"
-		(( ${int} <= -$THRESHOLD )) && signal="📉"
+		(( ${int:-0} >= $THRESHOLD )) && signal="🚀"
+		(( ${int:-0} <= -$THRESHOLD )) && signal="📉"
 		sed -i "s/$coin .*/$coin $newPrice/g" alertas
-		msg+="$coin $(formata $lastPrice) ➡️ $(formata $newPrice) ($variacao%) $signal
+		msg+="$coin $(formata $lastPrice) $symbol $(formata $newPrice) ($variacao%) $signal
 "
 	done
 	envia "$msg"
@@ -543,11 +547,11 @@ commandlistener(){
 						case $command in 
 							/coin*) [ "${command}" != "$last" ] && {
 								dono=$username
-								coin ${command/\/coin /};
+								coin ${command/\/coin /} &
 								atualizavar last "$command"; };;
-							/cotacoes) mensagem; 
+							/cotacoes) mensagem & 
 								atualizavar last "$command";;
-							/adiciona*) adiciona ${command/\/adiciona /} $username;
+							/adiciona*) adiciona ${command/\/adiciona /} $username &
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
@@ -559,23 +563,23 @@ commandlistener(){
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
-							/remove*) remove ${command/\/remove /} $username;
+							/remove*) remove ${command/\/remove /} $username &
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
-							/consulta) consulta $username;
+							/consulta) consulta $username &
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
-							/binance) binance $username;
+							/binance) binance $username &
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
-							/binancegrava) binance flag $username;
+							/binancegrava) binance flag $username &
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
-							/evolucao) evolucao $username;
+							/evolucao) evolucao $username &
 								command="$command $username";
 								echo $command;
 								atualizavar last "$command";;
@@ -600,7 +604,7 @@ commandlistener &
 
 while :
 do
-	alerta2
+	alerta2 
 	sleep 5m
 done &
 
