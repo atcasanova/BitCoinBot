@@ -9,7 +9,7 @@ envia(){
 	source variaveis.sh
 	curl -s -X POST "$apiurl/sendMessage" \
 	-F text="$*" -F parse_mode="markdown" \
-	-F chat_id=$CHATID 2>&1 >/dev/null 
+	-F chat_id=$CHATID 2>&1 >/dev/null
 }
 
 isAdmin(){
@@ -62,7 +62,7 @@ formata(){
 
 
 monitorar2(){
-	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; } 
+	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; }
 	local coin=${2^^}
 	local valor="$1"
 	[ "${valor^^}" == "LIST" ] && {
@@ -71,7 +71,7 @@ monitorar2(){
 	}
 	[ "${valor^^}" = "OFF" ] && {
 		grep -q "^$coin " alertas2 && {
-			sed -i "/^$coin /d" alertas2 
+			sed -i "/^$coin /d" alertas2
 			envia "$coin removida da monitoração"
 		} || {
 			envia "$coin não esta sendo monitorada"
@@ -80,7 +80,7 @@ monitorar2(){
 	}
 	grep -qE -- "^-[0-9]" <<< "$valor" && positivo=0 || positivo=1
 	read moeda maior menor < <(grep "^${coin:-vraaaaa} " alertas2)
-	[ -z $moeda ] && { 
+	[ -z $moeda ] && {
 		# moeda não monitorada
 		(( $positivo == 0 )) && {
 			echo "$coin 0 ${valor//-/}" >> alertas2
@@ -93,7 +93,7 @@ monitorar2(){
 		}
 		grep $coin alertas2
 
-	} || { 
+	} || {
 		# se a moeda ja existir
 		(( $positivo == 0 )) && {
 			sed -i "s/^\($coin [^ ]*\) .*/\1 ${valor//-/}/g" alertas2
@@ -125,7 +125,7 @@ alerta2(){
 }
 
 monitorar(){
-	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; } 
+	[ "$3" == "$MASTER" ] || { envia "Chora, @$3. Vc nao pode fazer isso"; return; }
 	local coin=${2^^}
 	[ "${1^^}" == "ON" ] && {
 		grep -q "^$coin " alertas && { envia "$coin ja esta sendo monitorada"; return; }
@@ -137,9 +137,9 @@ monitorar(){
 		grep -q "^$coin " alertas && {
 			sed -i "/^$coin /d" alertas
 			envia "$coin removida da monitoração"
-		} || { 
+		} || {
 			envia "$coin não esta sendo monitorada";
-			return; 
+			return;
 		}
 		
 	}
@@ -184,7 +184,7 @@ coin() {
 		|| qtd=0
 	json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
 	local usdt=$(getPrice USDTBRL)
-	cotacao=$(getPrice ${coin^^}USDT); 
+	cotacao=$(getPrice ${coin^^}USDT);
 	local img=$(curl -s https://coinmarketcap.com | grep -Po "font-size=\"1\">${coin^^}.*(?=(alt=\"[0-9]+-price-graph))"| sed 's/price-graph/\n/g'| head -1| grep -Eo "https://.*png")
 	(( ${#img} > 5 )) && wget -q "$img" -O ${coin^^}.png
 	grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
@@ -192,7 +192,7 @@ coin() {
 	grep -q "e" <<< $btc && btc=$(sed 's/e/*10^/' <<< "$btc" | bc -l)
 	grep -q "e" <<< $usd && usd=$(sed 's/e/*10^/' <<< "$usd" | bc -l)
 	[[ $qtd =~ [^[:digit:]\.] ]] && qtd=0
-	[ "$qtd" == "0" ] && { 
+	[ "$qtd" == "0" ] && {
 		local msg="\`\`\`
 Cotação CoinMarketCap para ${symbol^^}:
 USD $(formata $usd)
@@ -227,7 +227,7 @@ envia "$msg"
 		imagem=$(curl -s -X POST "$apiurl/sendPhoto" -F chat_id=$CHATID -F photo=@tmp.png |\
 	        jq -r '.result.photo[] | .file_id' | tail -1)
 		rm -f tmp.png ${coin^^}.png
-	} 
+	}
 	let creditos--
 	sed -i "s/$dono .*/$dono $creditos/g" credits
 }
@@ -268,7 +268,7 @@ grep -Eo "[0-9]*\.[0-9]{2}")%
 	msg+="
 *${maiorexchange:-MercadoBitCoin}/BTCUSD:* $rate
 "
-	(( ${#msg} > 2 )) && { 
+	(( ${#msg} > 2 )) && {
 		envia "$msg"
 	}
 	[ -s $(date "+%Y%m%d").dat ] && {
@@ -322,7 +322,6 @@ remove(){
 	} || envia "$dono não tem $moeda"
 }
 
-
 binance(){
 	[ -f .binancelock ] && { envia "Usuario $(cat .binancelock) já está consultando. Espere sua vez, fominha"; return 1; }
 	(( $# == 1 )) && { local flag=0; local dono=$1; }
@@ -336,11 +335,11 @@ binance(){
 	totaldolares=0
 	while read coin qtd; do
 		[ ${coin^^} == "USDT" ] && {
-			cotacao=1.0 
-			cotacaobtc=$(getPrice BTCUSDT); 
+			cotacao=1.0
+			cotacaobtc=$(getPrice BTCUSDT);
 		} || {
-			cotacao=$(getPrice ${coin^^}USDT); 
-			cotacaobtc=$(getPrice ${coin^^}BTC); 
+			cotacao=$(getPrice ${coin^^}USDT);
+			cotacaobtc=$(getPrice ${coin^^}BTC);
 		}
 		grep -qE "([0-9]+)?\.[0-9]+" <<< $cotacao || { envia "${coin^^} nao encontrada na Binance"; continue; }
 		value=$(bc <<< "scale=2; $cotacao*$qtd");
@@ -372,7 +371,7 @@ BTC $totalbtc
 	envia "$stack"
 	checkRecord $dono $totalreais
 	lista=$(echo "${lista::-1}"| sort -nr)
-	argvalor= 
+	argvalor=
 	argmoeda=
 	arglabel=
 	while IFS=, read valor moeda; do
@@ -473,7 +472,7 @@ BTC ${totalbtc}\`\`\`"
 	echo $graph valor de graph
 	echo "$(date +%Y%m%d%H%M),$totalreais" >> $dono.history
 	lista=$(sort -nr <<< "${lista::-1}")
-	argvalor= 
+	argvalor=
 	argmoeda=
 	arglabel=
 	while IFS=, read valor moeda; do
@@ -534,65 +533,52 @@ commandlistener(){
 	while : ; do
 		source variaveis.sh
 		for comando in $(curl -s  -X POST --data "offset=$(($offset+1))&limit=1" "$apiurl/getUpdates" |\
-		jq -r '"\(.result[].update_id) \(.result[].message.from.username) \(.result[].message.text)"'|\
-		sed 's| |\||g' | sort | uniq); do
+		jq -r '.result[] | "\(.update_id) \(.message.from.username) \(.message.text)"'|\
+		sed 's| |\||g'); do
 			read offset username command <<< $(sed 's/|/ /g' <<< "$comando")
 			shopt -s extglob
 			isAdmin "$username" && {
 				command=${command%%@*}
 				isValidCommand "$command" && {
 					source variaveis.sh
-					[ "$command" != "$last" ] && {
-						echo $offset - @$username - $command - $last >> comandos.log
-						case $command in 
-							/coin*) [ "${command}" != "$last" ] && {
-								dono=$username
-								coin ${command/\/coin /} &
-								atualizavar last "$command"; };;
-							/cotacoes) mensagem & 
-								atualizavar last "$command";;
-							/adiciona*) adiciona ${command/\/adiciona /} $username &
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/monitorar*) monitorar ${command/\/monitorar /} $username;
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/alertar*) monitorar2 ${command/\/alertar /} $username;
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/remove*) remove ${command/\/remove /} $username &
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/consulta) consulta $username &
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/binance) binance $username &
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/binancegrava) binance flag $username &
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/evolucao) evolucao $username &
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/creditos) checkCredits $username;
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-							/reset) resetCredits $username;
-								command="$command $username";
-								echo $command;
-								atualizavar last "$command";;
-						esac
-					}
+					echo $offset - @$username - $command >> comandos.log
+					case $command in
+						/coin*) dono=$username
+							coin ${command/\/coin /} &
+							echo ;;
+						/cotacoes) mensagem &
+							echo ;;
+						/adiciona*) adiciona ${command/\/adiciona /} $username &
+							command="$command $username";
+							echo $command;;
+						/monitorar*) monitorar ${command/\/monitorar /} $username;
+							command="$command $username";
+							echo $command;;
+						/alertar*) monitorar2 ${command/\/alertar /} $username;
+							command="$command $username";
+							echo $command;;
+						/remove*) remove ${command/\/remove /} $username &
+							command="$command $username";
+							echo $command;;
+						/consulta) consulta $username &
+							command="$command $username";
+							echo $command;;
+						/binance) binance $username &
+							command="$command $username";
+							echo $command;;
+						/binancegrava) binance flag $username &
+							command="$command $username";
+							echo $command;;
+						/evolucao) evolucao $username &
+							command="$command $username";
+							echo $command;;
+						/creditos) checkCredits $username;
+							command="$command $username";
+							echo $command;;
+						/reset) resetCredits $username;
+							command="$command $username";
+							echo $command;;
+					esac
 				}
 			}
 		done
@@ -604,11 +590,11 @@ commandlistener &
 
 while :
 do
-	alerta2 
+	alerta2
 	sleep 5m
 done &
 
-while : 
+while :
 do
 	echo "bot inicializado"
 	dolar=$(getLastDollar)
