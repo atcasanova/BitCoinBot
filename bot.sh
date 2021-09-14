@@ -401,7 +401,7 @@ consulta(){
 	dono=$1
 	creditos=$(grep "^$dono " credits | cut -f2 -d " ")
 	linhas=$(wc -l < $dono.coins)
-	(( $creditos < $linhas )) && { envia "Vc precisa de $linhas créditos, mas tem apenas $creditos. Use o /binance."; return; }
+	(( $creditos < $linhas )) && { envia "Vc precisa de $linhas créditos, mas tem apenas $creditos. Vou consultar na binance pra vc"; binance flag $dono & return; }
 	(( $creditos < 1 )) && { envia "Vc tá consultando demais, @$dono seu arrombado. Utilize o /binance"; return; }
 	echo $dono tem $creditos creditos
 #	[[ "$dono" == "eliashamu" ]] && { envia "Suas moedas desapareceram. Chame o FBI"; return 0; }
