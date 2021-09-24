@@ -375,7 +375,6 @@ BTC $totalbtc
 	argmoeda=
 	arglabel=
 	while IFS=, read valor moeda; do
-		echo buscando $moeda
 		percent=$(bc <<< "scale=2; (100*$valor)/$totalreais")
 		argvalor+="$percent,"
 		valor=$(formata $valor)
@@ -428,7 +427,6 @@ consulta(){
 		| jq -r ".data.BTC.quote.USD.price")
 	while read coin qtd; do
 		(( $creditos < 1 )) && { envia "Seus Créditos acabaram. Se fudeu"; graph=0; break; }
-		echo buscando $moeda
 		json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" \
 			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin \
 			| jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") \
@@ -476,7 +474,6 @@ BTC ${totalbtc}\`\`\`"
 	argmoeda=
 	arglabel=
 	while IFS=, read valor moeda; do
-		echo buscando $moeda
 		percent=$(bc <<< "scale=2; (100*$valor)/$totalreais")
 		argvalor+="$percent,"
 		valor=$(formata $valor)
