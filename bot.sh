@@ -1,6 +1,9 @@
 #!/bin/bash
 source variaveis.sh
-[ ! -s credits ] && { echo vou zerar; for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits; }
+[ ! -s credits ] && {
+	for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits;
+	sed -i "s/$MASTER .*/$MASTER $(($DAILYCREDITS*2))/g" credits
+}
 
 ct=0
 curl -s $apiurl/getMe 2>&1 >/dev/null
@@ -21,13 +24,15 @@ isValidCommand(){
 }
 
 getLastDollar(){
-	local offset=1;
-	local dolar=a;
-	while grep -vq "[0-9]" <<< $dolar; do
-		dolar=$(timeout 3 curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "-$offset days" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao" | jq '.value[].cotacaoCompra');
-		let offset++
-	done;
-	echo $dolar;
+#	local offset=1;
+#	local dolar=a;
+#	while grep -vq "[0-9]" <<< $dolar; do
+#		dolar=$(timeout 3 curl -s "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='$(date -d "-$offset days" "+%m-%d-%Y")'&$top=100&$skip=0&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao" | jq '.value[].cotacaoCompra');
+#		let offset++
+#	done;
+#	echo $dolar;
+	local pair=USDTBRL
+	curl -sk "https://api.binance.com/api/v3/ticker/price?symbol=${pair^^}" | jq '.price' -r
 }
 
 checkCredits(){
@@ -47,9 +52,10 @@ getPrice(){
 }
 
 resetCredits(){
-	[ "$1" == "atc1235" ] || { envia "sonha, @$1!"; checkCredits $1; return 1; }
+	[ "$1" == "$MASTER" ] || { envia "sonha, @$1!"; checkCredits $1; return 1; }
 	source variaveis.sh
 	for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits
+	sed -i "s/$MASTER .*/$MASTER $(($DAILYCREDITS*2))/g" credits
 	
 	envia "\`\`\`
 $(cat credits)
@@ -57,7 +63,7 @@ $(cat credits)
 }
 
 formata(){
-	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.2f" -- ${1/./,}
+	LC_ALL=pt_BR.utf-8 numfmt --format "%'0.4f" -- ${1/./,}
 }
 
 
@@ -182,7 +188,7 @@ coin() {
 	(( $# == 2 )) \
 		&& qtd=$2 \
 		|| qtd=0
-	json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
+	json="$(echo "$(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin | jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") $(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin&convert=BTC" | jq -r ".data.$coin.quote.BTC.price") $coin")"
 	local usdt=$(getPrice USDTBRL)
 	cotacao=$(getPrice ${coin^^}USDT);
 	local img=$(curl -s https://coinmarketcap.com | grep -Po "font-size=\"1\">${coin^^}.*(?=(alt=\"[0-9]+-price-graph))"| sed 's/price-graph/\n/g'| head -1| grep -Eo "https://.*png")
@@ -207,8 +213,7 @@ msg+="BTC $btc
 	read mbtc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/btc/ticker |\
 	jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"'))
 	IFS=, read reais maiorexchange <<< ${mbtc/.*/},MercadoBitCoin
-	local msg="\`\`\`
-${qtd} ${symbol^^} valem:
+	local msg="${qtd} ${symbol^^} valem: \`\`\`
 ${symbol^^} $btc (USD $(formata $usd))
 USD $(formata $(bc <<< "$usd*$qtd" ))
 "
@@ -246,7 +251,7 @@ mensagem (){
 	dolarbb=$(getLastDollar)
 	echo dolar: $dolarbb
 	echo consultando btc no coinmarketcap
-	xapo=$(printf "%0.2f" $(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price"))
+	xapo=$(printf "%0.2f" $(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price"))
 	echo btc: $xapo
 	echo consulta no mbtc
 	read btc btchigh btclow <<< $(printf "%0.2f " $(wget -qO- $mbtc/btc/ticker |\
@@ -348,9 +353,8 @@ binance(){
 		totaldolares=$(bc <<< "scale=2; $totaldolares+$value")
 		totalreais=$(bc <<< "scale=2; $totalreais+$brl")
 		local msg+="\`\`\`
-=========================
-${qtd} ${coin^^} valem:
-${coin^^} $cotacaobtc (USDT $(formata $cotacao))
+• ${qtd} ${coin^^}
+${coin^^} USDT $(formata $cotacao)
 USDT $(formata $value)
 BRL $(formata $brl)
 BTC $btcbrl
@@ -422,15 +426,23 @@ consulta(){
 	totalreais=0
 	totaldolares=0
 	totalbtc=0
-	btcprice=$(curl -sH "$COINMARKET" -H "Accept: application/json" \
+	btcprice=$(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" \
 		https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC \
 		| jq -r ".data.BTC.quote.USD.price")
 	while read coin qtd; do
 		(( $creditos < 1 )) && { envia "Seus Créditos acabaram. Se fudeu"; graph=0; break; }
-		json="$(echo "$(curl -sH "$COINMARKET" -H "Accept: application/json" \
-			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin \
-			| jq -r ".data.$coin.quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") \
+		[[ "$coin" == "HERO" || "$coin" == "TIME" ]] && {
+			[ "$coin" == "HERO" ] && { slug=metahero; number=10778; } || { slug=wonderland; number=11585; }
+			json="$(echo "$(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" \
+			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?slug=$slug \
+			| jq -r ".data.\"$number\".quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") \
 			$btcprice $coin")"
+			 } || {
+			json="$(echo "$(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" \
+			https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=$coin \
+			| jq -r ".data.\"$coin\".quote.USD | \"\(.price) \(.percent_change_1h) \(.percent_change_24h)\"") \
+			$btcprice $coin")"
+			}
 		grep "null" <<< "$json" && envia "${coin^^} não encontrada na coinmarketcap" || {
 			read usd change1h change24h btc symbol <<< $json
 			btc=$(bc -l <<< "$usd/$btc")
@@ -442,9 +454,7 @@ consulta(){
 			totaldolares=$(bc <<< "scale=2; $totaldolares+$dolares");
 			totalbtc=$(bc <<< "${totalbtc}+${btc:-0.0000000001}*$qtd")
 			local msg+="\`\`\`
-=========================
-${qtd} ${symbol^^} valem:
-${symbol^^} $btc (USD $(formata $usd))
+• ${qtd} ${symbol^^} (USD $(formata $usd))
 USD $(formata $dolares)
 BRL $(formata $reaist)
 BTC $(bc <<< "$btc*$qtd")
@@ -579,7 +589,7 @@ commandlistener(){
 				}
 			}
 		done
-	sleep 10s
+	sleep 3s
 	done
 }
 
@@ -603,7 +613,7 @@ do
 	sleep ${INTERVALO}m
 	msg=
 	
-	tmp=$(curl -sH "$COINMARKET" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price")
+	tmp=$(curl -sH "${COINMARKET[$(($RANDOM%2))]}" -H "Accept: application/json" "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC" | jq -r ".data.BTC.quote.USD.price")
 	xapo=$(printf "%0.2f " ${tmp})
 	tmp=$(wget -qO- $mbtc/btc/ticker |jq -r '"\(.ticker.last) \(.ticker.high) \(.ticker.low)"')
 	(( ${#tmp} < 2 )) && {
@@ -637,7 +647,9 @@ do
 	[ ! -s $(date "+%Y%m%d").dat ] && {
 		echo "##hora valor" > $(date "+%Y%m%d").dat
 		for admin in ${ADMINS[@]}; do echo $admin $DAILYCREDITS; done > credits
+		sed -i "s/$MASTER .*/$MASTER $((DAILYCREDITS*2))/g" credits
 		envia "Todos os usuários agora tem $DAILYCREDITS consultas"
+		for user in ${ADMINS[@]}; do ./fixhistory.sh $user; done
 	}
 	read gmbtc gfoxbit btcusd <<< "${btc:-0} ${foxbitsell:-0} ${btcusd:-0}"
 	echo "$(date "+%H:%M:%S") ${gmbtc/.*/} ${gfoxbit/.*/} ${btcusd/.*/}" >> $(date "+%Y%m%d").dat
